@@ -3,28 +3,35 @@ import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeProvider'
 import { auth } from '../../firebaseConfig'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { FirebaseError } from 'firebase/app'
 
 
-export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation: any; setIsLoggedIn: (value: boolean) => void }) {
+export default function registerScreen({ navigation, setIsLoggedIn }: { navigation: any, setIsLoggedIn: (value: boolean) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
 
-
-  async function handleLogin() {
-    if (!email || !password) {
-      setError('Please enter email and password!')
-      return
-    }
+  async function handleRegister() {
     try {
       setError('')
-      await signInWithEmailAndPassword(auth, email, password)
+      await createUserWithEmailAndPassword(auth, email, password)
       setIsLoggedIn(true)
     } catch(err) {
-      setError('Email or password is incorrect!')
+      const error = err as FirebaseError
+
+      if (error.code === 'auth/email-already-in-use') {
+        setError('User already exists.')
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email address.')
+      } else if (error.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters.')
+      } else {
+        setError(error.message)
+      }
+
       setIsLoggedIn(false)
     }
   }
@@ -32,7 +39,7 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.title}>Welcome</Text>
 
         <TextInput
           placeholder='Email'
@@ -49,28 +56,26 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
           onChangeText={setPassword}
         />
 
-        {error ? 
+        {error ?
           <Text style={styles.errorMessage}>{error}</Text>
           : null
         }
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Login</Text>
+        <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
+          <Text style={styles.registerButtonText}>Register</Text>
         </TouchableOpacity>
 
-        <View></View>
-
         <TouchableOpacity
-          style={[styles.loginButton, styles.googleButton]}
+          style={[styles.registerButton, styles.googleButton]}
           onPress={() => console.log('Hi!')}
         >
-          <Text style={styles.loginButtonText}>Login with Google</Text>
+          <Text style={styles.registerButtonText}>Register with Google</Text>
         </TouchableOpacity>
 
         <View style={styles.signupContainer}>
-          <Text style={styles.signupText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.replace('RegisterScreen')}>
-            <Text style={styles.signupButtonText}> Sign Up</Text>
+          <Text style={styles.signupText}>Already have an account?</Text>
+          <TouchableOpacity onPress={() => navigation.replace('LoginScreen')}>
+            <Text style={styles.signupButtonText}> Log In</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -112,7 +117,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     marginBottom: 15,
     color: theme.colors.text
   },
-  loginButton: {
+  registerButton: {
     width: '100%',
     backgroundColor: theme.colors.primary,
     padding: 15,
@@ -121,9 +126,9 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 10
   },
   googleButton: {
-    backgroundColor: '#e59c95',
+    backgroundColor: '#DB4437',
   },
-  loginButtonText: {
+  registerButtonText: {
     color: theme.colors.text1,
     fontWeight: 'bold',
     fontSize: 16

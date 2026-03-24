@@ -38,12 +38,30 @@ export const DefaultTheme = {
   dark: false,
   fonts: navFonts,
   colors: {
+    primary: '#84A98C', // Buttons, active tabs, links
+    secondary1: '#2F3E46', 
+    secondary2: '#CBF3BB',
+    text1: '#354F52',
+    text2: '#52796F',
+    card: '#baceac',      
+    text: '#354F52',     
+    border: 'transparent',
+    notification: '#ff0000',
+    background: '#D6E0C9',
+  },
+};
+
+export const Default1Theme = {
+  name: 'default',
+  dark: false,
+  fonts: navFonts,
+  colors: {
     primary: '#84A98C',
     secondary1: '#2F3E46',
     secondary2: '#CBF3BB',
     text1: '#354F52',
     text2: '#52796F',
-    card: '#CBF3BB',      
+    card: '#C2D1B8',      
     text: '#354F52',     
     border: 'transparent',
     notification: '#ff0000',
