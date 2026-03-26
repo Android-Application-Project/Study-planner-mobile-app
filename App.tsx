@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme as NavDefaultTheme } from '@react-nav
 import AppNavigator from './src/navigation/AppNavigator';
 import ThemeProvider from './src/utils/ThemeProvider';
 import { useTheme } from './src/utils/ThemeProvider';
+import { useFonts } from 'expo-font';
 
 function MainApp() {
   const { theme } = useTheme()
@@ -25,6 +26,12 @@ function MainApp() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Itim-Regular': require('./src/assets/fonts/Itim-Regular.ttf'),
+  });
+
+  if (!fontsLoaded) return null; // or a splash screen
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

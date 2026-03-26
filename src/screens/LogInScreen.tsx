@@ -56,6 +56,7 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
 
       <TextInput
         placeholder='Email'
+        placeholderTextColor={theme.colors.text2}
         style={styles.input}
         value={email}
         onChangeText={setEmail}
@@ -69,6 +70,7 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
       <View style={styles.passwordContainer}>
         <TextInput
           placeholder="Password"
+          placeholderTextColor={theme.colors.text2}
           style={styles.passwordInput}
           value={password}
           secureTextEntry={!showPassword}
@@ -141,7 +143,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   input: {
     width: '100%',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
@@ -163,7 +165,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     marginBottom: 15,
   },
