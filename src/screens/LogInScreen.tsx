@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeProvider'
@@ -7,7 +7,6 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import * as Google from 'expo-auth-session/providers/google'
 import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
 import Feather from '@expo/vector-icons/Feather';
-
 
 export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation: any; setIsLoggedIn: (value: boolean) => void }) {
   const [email, setEmail] = useState('')
@@ -81,7 +80,7 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
           onPress={() => setShowPassword(!showPassword)}
         >
           <Feather
-            name={showPassword ? "eye-off" : "eye"}
+            name={showPassword ? "eye" : "eye-off"}
             size={22}
             color="gray"
           />
@@ -99,11 +98,15 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
       </View>
 
       <TouchableOpacity
-        style={[styles.loginButton, styles.googleButton]}
-        onPress={handleGoogle}
+        style={styles.button}
         disabled={!request}
+        onPress={handleGoogle}
       >
-        <Text style={styles.loginButtonText}>Google</Text>
+        <Image
+          style={styles.icon}
+          source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+        />
+        <Text style={styles.text}>Sign in with Google</Text>
       </TouchableOpacity>
 
       <View style={styles.signupContainer}>
@@ -122,13 +125,13 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.background,
     paddingHorizontal: 20,
-    paddingVertical: 80
+    paddingVertical: 100
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginBottom: 20
+    marginBottom: 0
   },
   subTitle: {
     fontSize: 18,
@@ -138,7 +141,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   input: {
     width: '100%',
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#cddec3",
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
@@ -150,23 +153,25 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     padding: 15,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   passwordContainer: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#cddec3",
     borderRadius: 12,
     marginBottom: 15,
   },
-
   passwordInput: {
     flex: 1,
     padding: 15,
     color: theme.colors.text
   },
-
   eyeIcon: {
     paddingHorizontal: 12
   },
@@ -175,19 +180,14 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     marginVertical: 15
   },
-
   orLine: {
     flex: 1,
     height: 1,
     backgroundColor: '#ccc'
   },
-
   orText: {
     marginHorizontal: 10,
     color: theme.colors.text
-  },
-  googleButton: {
-    backgroundColor: '#e59c95',
   },
   loginButtonText: {
     color: theme.colors.text1,
@@ -207,5 +207,28 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   errorMessage: {
     color: theme.colors.notification
-  }
+  },
+  button: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  icon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  text: {
+    color: '#000',
+    fontWeight: '500',
+  },
 })

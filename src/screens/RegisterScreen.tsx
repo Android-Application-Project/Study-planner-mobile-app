@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeProvider'
@@ -6,6 +6,8 @@ import { auth } from '../../firebaseConfig'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import Feather from '@expo/vector-icons/Feather';
+import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
+import * as Google from 'expo-auth-session/providers/google'
 
 export default function registerScreen({ navigation, setIsLoggedIn }: { navigation: any, setIsLoggedIn: (value: boolean) => void }) {
   const [email, setEmail] = useState('')
@@ -14,6 +16,24 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
   const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: googleAuthConfig.webClientId,
+    iosClientId: googleAuthConfig.iosClientId,
+    scopes: ['profile', 'email']
+  })
+
+  const handleGoogle = async () => {
+    try {
+      setError('')
+      const result = await signInWithGoogle(promptAsync)
+      if (result) setIsLoggedIn(true)
+    } catch (err) {
+      console.log('Error handleGoogle: ', err)
+      setError('Google sign-in failed')
+      setIsLoggedIn(false)
+    }
+  }
 
   async function handleRegister() {
     try {
@@ -40,6 +60,7 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome</Text>
+      <Text style={styles.subTitle}>Let's locked in together!</Text>
 
       <TextInput
         placeholder='Email'
@@ -62,7 +83,7 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
           onPress={() => setShowPassword(!showPassword)}
         >
           <Feather
-            name={showPassword ? "eye-off" : "eye"}
+            name={showPassword ? "eye" : "eye-off"}
             size={22}
             color="gray"
           />
@@ -78,11 +99,22 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
         <Text style={styles.registerButtonText}>Register</Text>
       </TouchableOpacity>
 
+      <View style={styles.orContainer}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orLine} />
+      </View>
+
       <TouchableOpacity
-        style={[styles.registerButton, styles.googleButton]}
-        onPress={() => console.log('Hi!')}
+        style={styles.button}
+        disabled={!request}
+        onPress={handleGoogle}
       >
-        <Text style={styles.registerButtonText}>Register with Google</Text>
+        <Image
+          style={styles.icon}
+          source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+        />
+        <Text style={styles.text}>Sign in with Google</Text>
       </TouchableOpacity>
 
       <View style={styles.signupContainer}>
@@ -101,7 +133,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.background,
     paddingHorizontal: 20,
-    paddingVertical: 80
+    paddingVertical: 100
   },
   card: {
     width: '90%',
@@ -121,9 +153,15 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.text,
     marginBottom: 20
   },
+  subTitle: {
+    fontSize: 18,
+    fontWeight: 'normal',
+    color: theme.colors.text,
+    marginBottom: 20
+  },
   input: {
     width: '100%',
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#cddec3",
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
@@ -141,7 +179,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    backgroundColor: "#cddec3",
     borderRadius: 12,
     marginBottom: 15,
   },
@@ -153,8 +191,42 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   eyeIcon: {
     paddingHorizontal: 12
   },
-  googleButton: {
-    backgroundColor: '#DB4437',
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc'
+  },
+  orText: {
+    marginHorizontal: 10,
+    color: theme.colors.text
+  },
+  button: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  icon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  text: {
+    color: '#000',
+    fontWeight: '500',
   },
   registerButtonText: {
     color: theme.colors.text1,
