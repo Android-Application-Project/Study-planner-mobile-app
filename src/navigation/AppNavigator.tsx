@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native'
 import { useState } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Octicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Octicons, MaterialCommunityIcons, MaterialIcons, AntDesign } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen'
 import ProfileScreen from '../screens/ProfileScreen'
 import RoomScreen from '../screens/RoomScreen'
@@ -36,7 +36,7 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
               return (
                 <MaterialCommunityIcons 
                 name={focused ? 'account-group-outline' : 'account-group'} 
-                size={24} 
+                size={31} 
                 color={color}
                 />
               )
@@ -44,7 +44,7 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
                 return (
                   <MaterialIcons 
                   name={focused ? 'add-circle-outline' : 'add-circle'}
-                  size={24} 
+                  size={30} 
                   color={color}
                   />
                 )
@@ -52,17 +52,13 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
                   return (
                     <MaterialCommunityIcons 
                     name={focused ? 'storefront-outline' : 'storefront'}
-                    size={24} 
+                    size={30} 
                     color={color}
                     />
                   )
                   case 'Profile':
                     return (
-                      <MaterialCommunityIcons 
-                      name={focused ? 'checkbox-blank-circle-outline' : 'checkbox-blank-circle'}
-                      size={24} 
-                      color={color}
-                      />
+                      <AntDesign name="menu" size={24} color={color} />
                     )
                   }
                 }
@@ -84,7 +80,7 @@ export default function AppNavigator() {
     <Stack.Navigator>
       {isLoggedIn ? (
         <>
-          <Stack.Screen name='Tabs'>
+          <Stack.Screen name='Tabs' options={{ headerShown: false }}>
             {(props) => <Tabs {...props} setIsLoggedIn={setIsLoggedIn} />}
           </Stack.Screen>          
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
