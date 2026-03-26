@@ -4,15 +4,36 @@ import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeProvider'
 import { auth } from '../../firebaseConfig'
 import { signInWithEmailAndPassword } from 'firebase/auth'
+import * as Google from 'expo-auth-session/providers/google'
+import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
+import Feather from '@expo/vector-icons/Feather';
 
 
 export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation: any; setIsLoggedIn: (value: boolean) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
 
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: googleAuthConfig.webClientId,
+    iosClientId: googleAuthConfig.iosClientId,
+    scopes: ['profile', 'email']
+  })
+
+  const handleGoogle = async () => {
+    try {
+      setError('')
+      const result = await signInWithGoogle(promptAsync)
+      if (result) setIsLoggedIn(true)
+    } catch (err) {
+      console.log('Error handleGoogle: ', err)
+      setError('Google sign-in failed')
+      setIsLoggedIn(false)
+    }
+  }
 
   async function handleLogin() {
     if (!email || !password) {
@@ -31,48 +52,65 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back</Text>
+      <Text style={styles.title}>Welcome Back</Text>
+      <Text style={styles.subTitle}>We're excited to see you again!</Text>
 
-        <TextInput
-          placeholder='Email'
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-        />
+      <TextInput
+        placeholder='Email'
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+      />
 
+      {error ? 
+        <Text style={styles.errorMessage}>{error}</Text>
+        : null
+      }
+      
+      <View style={styles.passwordContainer}>
         <TextInput
-          placeholder='Password'
-          style={styles.input}
+          placeholder="Password"
+          style={styles.passwordInput}
           value={password}
-          secureTextEntry
+          secureTextEntry={!showPassword}
           onChangeText={setPassword}
         />
 
-        {error ? 
-          <Text style={styles.errorMessage}>{error}</Text>
-          : null
-        }
-
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
-
-        <View></View>
-
         <TouchableOpacity
-          style={[styles.loginButton, styles.googleButton]}
-          onPress={() => console.log('Hi!')}
+          style={styles.eyeIcon}
+          onPress={() => setShowPassword(!showPassword)}
         >
-          <Text style={styles.loginButtonText}>Login with Google</Text>
+          <Feather
+            name={showPassword ? "eye-off" : "eye"}
+            size={22}
+            color="gray"
+          />
         </TouchableOpacity>
+      </View>
 
-        <View style={styles.signupContainer}>
-          <Text style={styles.signupText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.replace('RegisterScreen')}>
-            <Text style={styles.signupButtonText}> Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+        <Text style={styles.loginButtonText}>Login</Text>
+      </TouchableOpacity>
+
+      <View style={styles.orContainer}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orLine} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.loginButton, styles.googleButton]}
+        onPress={handleGoogle}
+        disabled={!request}
+      >
+        <Text style={styles.loginButtonText}>Google</Text>
+      </TouchableOpacity>
+
+      <View style={styles.signupContainer}>
+        <Text style={styles.signupText}>Don't have an account?</Text>
+        <TouchableOpacity onPress={() => navigation.replace('RegisterScreen')}>
+          <Text style={styles.signupButtonText}> Sign Up</Text>
+        </TouchableOpacity>
       </View>
     </View>
   )
@@ -81,26 +119,20 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
-    padding: 20
-  },
-  card: {
-    width: '90%',
-    padding: 30,
-    borderRadius: 20,
-    backgroundColor: theme.colors.card,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
-    alignItems: 'center'
+    paddingHorizontal: 20,
+    paddingVertical: 80
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 20
+  },
+  subTitle: {
+    fontSize: 18,
+    fontWeight: 'normal',
     color: theme.colors.text,
     marginBottom: 20
   },
@@ -119,6 +151,40 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10
+  },
+  passwordContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+
+  passwordInput: {
+    flex: 1,
+    padding: 15,
+    color: theme.colors.text
+  },
+
+  eyeIcon: {
+    paddingHorizontal: 12
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15
+  },
+
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc'
+  },
+
+  orText: {
+    marginHorizontal: 10,
+    color: theme.colors.text
   },
   googleButton: {
     backgroundColor: '#e59c95',

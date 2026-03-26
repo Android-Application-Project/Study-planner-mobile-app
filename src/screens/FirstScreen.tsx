@@ -2,6 +2,15 @@ import { StyleSheet, Text, View, TouchableOpacity } from 'react-native'
 import { useMemo } from 'react'
 import { useTheme } from '../utils/ThemeProvider'
 import { Theme } from '../utils/Themes'
+import { makeRedirectUri } from 'expo-auth-session';
+
+// TS-safe way to include useProxy
+const redirectUri = makeRedirectUri({ 
+  // @ts-ignore
+  useProxy: true 
+});
+
+console.log('Redirect URI:', redirectUri);
 
 export default function FirstScreen({ navigation }: any) {
     const { theme } = useTheme()
