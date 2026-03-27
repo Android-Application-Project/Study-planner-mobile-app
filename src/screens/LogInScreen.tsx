@@ -133,7 +133,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginBottom: 0
+    marginBottom: 20
   },
   subTitle: {
     fontSize: 18,

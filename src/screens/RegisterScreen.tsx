@@ -161,7 +161,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   input: {
     width: '100%',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
@@ -179,7 +179,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     marginBottom: 15,
   },

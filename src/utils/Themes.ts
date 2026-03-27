@@ -40,10 +40,11 @@ export const DefaultTheme = {
   colors: {
     primary: '#84A98C', 
     secondary1: '#2F3E46', 
-    secondary2: '#CBF3BB',
+    secondary2: '#b1c7b6',
     text1: '#354F52',
     text2: '#52796F',
     card: '#baceac',   // #cddec3 
+    card2: '#f4f8f2',
     text: '#354F52',     
     border: 'transparent',
     notification: '#ff0000',

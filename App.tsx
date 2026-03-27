@@ -26,12 +26,6 @@ function MainApp() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    'Itim-Regular': require('./src/assets/fonts/Itim-Regular.ttf'),
-  });
-
-  if (!fontsLoaded) return null; // or a splash screen
-
   return (
     <SafeAreaProvider>
       <ThemeProvider>
