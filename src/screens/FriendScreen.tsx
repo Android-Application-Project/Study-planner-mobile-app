@@ -1,6 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View, FlatList } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, {useMemo} from 'react'
+import React, { useMemo } from 'react'
 import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 import { Feather } from '@expo/vector-icons';
@@ -10,20 +9,22 @@ export default function FriendScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const Friends = [
-    {id: '1', name: 'Jason', avatar: '', status: 'Studying Math', isOnline: true, streak: 12},
-    {id: '2', name: 'Christopher', avatar: '', status: 'Studying Math', isOnline: true, streak: 90},
+    { id: '1', name: 'Jason', avatar: '🦊', status: 'Studying Math', isOnline: true, streak: 12 },
+    { id: '2', name: 'Christopher', avatar: '🐱', status: 'Resting', isOnline: false, streak: 90 },
+    { id: '3', name: 'Emma', avatar: '🐰', status: 'In a Pomodoro', isOnline: true, streak: 5 },
   ]
 
-  const renderFriend = ({item} : any) => (
-    <TouchableOpacity style={styles.friendCard} activeOpacity={0.7}>
-      <View style = {styles.avatarContainer}>
-        <View style = {styles.avatarBg}>
-          <Text>{item.avatar}</Text>
+  const renderFriend = ({ item }: any) => (
+    <TouchableOpacity style={styles.friendCard} activeOpacity={0.8}>
+      
+      <View style={styles.avatarContainer}>
+        <View style={styles.avatarBg}>
+          <Text style={styles.avatarText}>{item.avatar}</Text>
         </View>
-        {item.isOnline && <View style = {styles.onlineDot}/>}
+        {item.isOnline && <View style={styles.onlineDot} />}
       </View>
 
-      <View style = {styles.infoContainer}>
+      <View style={styles.infoContainer}>
         <Text style={styles.friendName}>{item.name}</Text>
         <Text style={[
           styles.friendStatus, 
@@ -31,19 +32,21 @@ export default function FriendScreen() {
         ]}>{item.status}</Text>
       </View>
 
-      <View>
-        <Text>🔥{item.streak}</Text>
+      <View style={styles.streakContainer}>
+        <Text style={styles.streakText}>🔥 {item.streak}</Text>
       </View>
+      
     </TouchableOpacity>
   )
 
-return (
-    <SafeAreaView style={styles.container}>
+  return (
+    <View style={styles.container}>
       
       <View style={styles.header}>
-        <Text style={styles.title}>Friends</Text>
+        <Text style={styles.title}>My Friends</Text>
         <TouchableOpacity style={styles.addButton}>
-          <Feather name="user-plus" size={24} color={theme.colors.text1} />
+          <Feather name="user-plus" size={20} color="#FFF" />
+          <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
 
@@ -55,14 +58,13 @@ return (
         contentContainerStyle={styles.listContent}
       />
 
-    </SafeAreaView>
+    </View>
   )
 }
 
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   
   header: {
@@ -70,20 +72,29 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 30,
-    marginBottom: 30,
+    marginBottom: 20,
+    marginTop: 10,
   },
 
   title: {
-    fontSize: 32,
+    fontSize: 22, 
     fontWeight: '800',
     color: theme.colors.text1,
-    letterSpacing: 0.5,
   },
 
   addButton: {
-    padding: 10,
-    backgroundColor: theme.colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderRadius: 20,
+  },
+  addButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    marginLeft: 5,
+    fontSize: 14,
   },
 
   listContent: {
@@ -94,11 +105,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    marginBottom: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderRadius: 24,
+    marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
   
   avatarContainer: {
@@ -107,15 +118,15 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
 
   avatarBg: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: theme.colors.background,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E5EDDF', 
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 26,
+    fontSize: 28,
   },
   onlineDot: {
     position: 'absolute',
@@ -126,7 +137,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#4CAF50',
     borderWidth: 2,
-    borderColor: theme.colors.card, 
+    borderColor: '#FFFFFF', 
   },
 
   infoContainer: {
@@ -135,24 +146,24 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   friendName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: theme.colors.text1,
     marginBottom: 4,
   },
   friendStatus: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   streakContainer: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#E5EDDF', 
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 15,
   },
   streakText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: theme.colors.text1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.colors.primary,
   }
 });
