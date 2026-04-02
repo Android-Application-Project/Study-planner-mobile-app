@@ -1,60 +1,144 @@
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated } from 'react-native'
-import { useMemo, useEffect, useRef } from 'react'
-import { useTheme } from '../utils/ThemeProvider'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
+import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
+import { useTheme } from '../utils/ThemeProvider'
+import { db, auth } from '../../firebaseConfig'
+import { doc, setDoc } from 'firebase/firestore'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { FirebaseError } from 'firebase/app'
+import Feather from '@expo/vector-icons/Feather';
+import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
+import * as Google from 'expo-auth-session/providers/google'
 
-const { width, height } = Dimensions.get('window')
-
-export default function FirstScreen({ navigation }: any) {
+export default function registerScreen({ navigation, setIsLoggedIn }: { navigation: any, setIsLoggedIn: (value: boolean) => void }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
-  
-  const animals = ["🐸","🐱","🦊","🐷","🐶"]
-  const animations = useRef(animals.map(() => new Animated.Value(0))).current
 
-  const startPositions = animals.map(() => Math.random() > 0.5 ? -100 : width + 100)
-  const laneHeight = height * 0.5 / animals.length;
-  const topPositions = animals.map((_, i) => i * laneHeight + 40)
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: googleAuthConfig.webClientId,
+    iosClientId: googleAuthConfig.iosClientId,
+    scopes: ['profile', 'email']
+  })
 
+  const handleGoogle = async () => {
+    try {
+      setError('')
+      const result = await signInWithGoogle(promptAsync)
+      if (result) setIsLoggedIn(true)
+    } catch (err) {
+      console.log('Error handleGoogle: ', err)
+      setError('Google sign-in failed')
+      setIsLoggedIn(false)
+    }
+  }
 
-  useEffect(() => {
-    animations.forEach((animal, i) => {
-      const from = startPositions[i]
-      const to = from < 0 ? width + 100 : -100
+  async function handleRegister() {
+    try {
+      setError('')
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      await updateProfile(userCredential.user, { displayName: username })
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        username: username,
+        email: email,
+        createdAt: new Date()
+      })
 
-      animal.setValue(from)
+      setIsLoggedIn(true)
 
-      Animated.loop(
-        Animated.timing(animal, {
-          toValue: to,
-          duration: 2000 + Math.random() * 3000,
-          useNativeDriver: true
-        })
-      ).start()
-    })
-  }, [])
+    } catch(err) {
+      const error = err as FirebaseError
+
+      if (error.code === 'auth/email-already-in-use') {
+        setError('User already exists.')
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email address.')
+      } else if (error.code === 'auth/weak-password') {
+        setError('Password should be at least 6 characters.')
+      } else {
+        setError(error.message)
+      }
+
+      setIsLoggedIn(false)
+    }
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.animals}>
-        {animals.map((animal, index) => (
-          <Animated.Text 
-            key={index}
-            style={[styles.animal, { top: topPositions[index], transform: [{ translateX: animations[index] }]}]}
-          >
-            {animal}
-          </Animated.Text>
-        ))}
+      <Text style={styles.title}>Welcome</Text>
+      <Text style={styles.subTitle}>Let's locked in together!</Text>
+
+      <TextInput
+        placeholder='Email'
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+      />
+
+      <TextInput
+        placeholder='Username'
+        style={styles.input}
+        value={username}
+        onChangeText={setUsername}
+      />
+
+      <View style={styles.passwordContainer}>
+        <TextInput
+          placeholder="Password"
+          style={styles.passwordInput}
+          value={password}
+          secureTextEntry={!showPassword}
+          onChangeText={setPassword}
+        />
+
+        <TouchableOpacity
+          style={styles.eyeIcon}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Feather
+            name={showPassword ? "eye" : "eye-off"}
+            size={22}
+            color="gray"
+          />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('LoginScreen')}>
-            <Text style={styles.loginButtonText}>Login</Text>
-          </TouchableOpacity>
+      {error ?
+        <Text style={styles.errorMessage}>{error}</Text>
+        : null
+      }
 
-          <TouchableOpacity style={styles.registerButton} onPress={() => navigation.navigate('RegisterScreen')}>
-            <Text style={styles.loginButtonText}>Register</Text>
-          </TouchableOpacity>
+      <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
+        <Text style={styles.registerButtonText}>Register</Text>
+      </TouchableOpacity>
+
+      <View style={styles.orContainer}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orLine} />
+      </View>
+
+      <TouchableOpacity
+        style={styles.button}
+        disabled={!request}
+        onPress={handleGoogle}
+      >
+        <Image
+          style={styles.icon}
+          source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+        />
+        <Text style={styles.text}>Sign in with Google</Text>
+      </TouchableOpacity>
+
+      <View style={styles.signupContainer}>
+        <Text style={styles.signupText}>Already have an account?</Text>
+        <TouchableOpacity onPress={() => navigation.replace('LoginScreen')}>
+          <Text style={styles.signupButtonText}> Log In</Text>
+        </TouchableOpacity>
       </View>
     </View>
   )
@@ -63,41 +147,121 @@ export default function FirstScreen({ navigation }: any) {
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    paddingVertical: 80
-  },
-  buttonsContainer: {
-    backgroundColor: theme.colors.background,
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 20,
+    paddingVertical: 100
   },
-  animals: {
-    flex: 1,
-    paddingVertical: 80
+  card: {
+    width: '90%',
+    padding: 30,
+    borderRadius: 20,
+    backgroundColor: theme.colors.card,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+    alignItems: 'center'
   },
-  animal: {
-    position: "absolute",
-    fontSize: 60
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 20
   },
-  loginButton: {
-      width: '100%',
-      backgroundColor: theme.colors.primary,
-      padding: 15,
-      borderRadius: 12,
-      alignItems: 'center',
-      marginTop: 10
+  subTitle: {
+    fontSize: 18,
+    fontWeight: 'normal',
+    color: theme.colors.text,
+    marginBottom: 20
+  },
+  input: {
+    width: '100%',
+    backgroundColor: theme.colors.card,
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+    color: theme.colors.text
   },
   registerButton: {
-      width: '100%',
-      backgroundColor: theme.colors.secondary2,
-      padding: 15,
-      borderRadius: 12,
-      alignItems: 'center',
-      marginTop: 10
+    width: '100%',
+    backgroundColor: theme.colors.primary,
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 10
   },
-  loginButtonText: {
-      color: theme.colors.text1,
-      fontWeight: 'bold',
-      fontSize: 16
+  passwordContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    marginBottom: 15,
   },
+  passwordInput: {
+    flex: 1,
+    padding: 15,
+    color: theme.colors.text
+  },
+  eyeIcon: {
+    paddingHorizontal: 12
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 15
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc'
+  },
+  orText: {
+    marginHorizontal: 10,
+    color: theme.colors.text
+  },
+  button: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  icon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  text: {
+    color: '#000',
+    fontWeight: '500',
+  },
+  registerButtonText: {
+    color: theme.colors.text1,
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  signupContainer: {
+    flexDirection: 'row',
+    marginTop: 15
+  },
+  signupText: {
+    color: theme.colors.text
+  },
+  signupButtonText: {
+    color: theme.colors.primary,
+    fontWeight: 'bold'
+  },
+  errorMessage: {
+    color: theme.colors.notification
+  }
 })

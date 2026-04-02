@@ -77,7 +77,6 @@ export default function RoomScreen() {
         if (type === 'break') setBreakTime(prev => Math.max(1, prev + amount));
     };
 
-    // 🔥 4. 將新建的房間上傳到 Firebase
     const handleCreateRoom = async () => {
       if (newRoomName.trim() === '') {
         alert("Please enter a room name!"); 
