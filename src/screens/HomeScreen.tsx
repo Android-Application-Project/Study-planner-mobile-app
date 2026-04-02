@@ -9,10 +9,25 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 
+import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase'; 
+
+const getTodayStr = () => new Date().toISOString().split('T')[0];
+const getYesterdayStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+};
+
 export default function HomeScreen() {
   const navigation = useNavigation<any>()
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const USER_ID = "my_test_user_001"; 
+
+  const [streak, setStreak] = useState(0);
+  const [lastFocusDate, setLastFocusDate] = useState<string | null>(null);
   
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('English');
@@ -36,10 +51,29 @@ export default function HomeScreen() {
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false); 
   const [currentRound, setCurrentRound] = useState(1); 
-
   const [isModalVisible, setModalVisible] = useState(false);
-
   const animatedTimeLeft = useRef(new Animated.Value(timeLeft)).current;
+
+  useEffect(() => {
+    if (!db) return; 
+    const userRef = doc(db, 'users', USER_ID);
+
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.streak !== undefined) setStreak(data.streak);
+        if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
+        if (data.subjectConfigs) setSubjectConfigs(data.subjectConfigs);
+      } else {
+        setDoc(userRef, {
+          streak: 0, 
+          lastFocusDate: null,
+          subjectConfigs: subjectConfigs 
+        });
+      }
+    });
+    return () => unsubscribe(); 
+  }, []);
 
   const rotateAnimation = animatedTimeLeft.interpolate({
     inputRange: [0, (isBreak ? currentConfig.break : currentConfig.focus) * 60],
@@ -47,16 +81,13 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-
     Animated.timing(animatedTimeLeft, {
       toValue: timeLeft, 
       duration: isActive && timeLeft > 0 ? 1000 : 0,
       easing: Easing.linear,
       useNativeDriver: true, 
     }).start();
-
   }, [isActive, timeLeft, animatedTimeLeft]);
-
 
   useEffect(() => {
     setIsActive(false);
@@ -66,7 +97,6 @@ export default function HomeScreen() {
     setTimeLeft(newFocusTime);
     animatedTimeLeft.setValue(newFocusTime);
   }, [value, animatedTimeLeft]); 
-
 
   useEffect(() => {
     if (!isActive) {
@@ -100,18 +130,35 @@ export default function HomeScreen() {
           const resetFocusTime = currentConfig.focus * 60;
           setTimeLeft(resetFocusTime);
           animatedTimeLeft.setValue(resetFocusTime); 
-        }
-          } else {
-            setCurrentRound(prev => prev + 1);
-            setIsBreak(false);
-            const nextFocusTime = currentConfig.focus * 60;
-            setTimeLeft(nextFocusTime);
-            animatedTimeLeft.setValue(nextFocusTime); 
-          }
-        }
 
-        return () => clearInterval(interval);
-    }, [isActive, timeLeft, isBreak, currentConfig, currentRound, animatedTimeLeft]);
+          const today = getTodayStr();
+          const yesterday = getYesterdayStr();
+          let newStreak = streak;
+
+          if (lastFocusDate === yesterday) {
+            newStreak = streak + 1; 
+          } else if (lastFocusDate === today) {
+            newStreak = streak; 
+          } else {
+            newStreak = 1;
+          }
+
+          updateDoc(doc(db, 'users', USER_ID), {
+             streak: newStreak,
+             lastFocusDate: today
+          });
+        }
+      } else {
+        setCurrentRound(prev => prev + 1);
+        setIsBreak(false);
+        const nextFocusTime = currentConfig.focus * 60;
+        setTimeLeft(nextFocusTime);
+        animatedTimeLeft.setValue(nextFocusTime); 
+      }
+    }
+
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft, isBreak, currentConfig, currentRound, animatedTimeLeft, streak, lastFocusDate]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -119,9 +166,7 @@ export default function HomeScreen() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleToggleTimer = () => {
-    setIsActive(!isActive)
-  }
+  const handleToggleTimer = () => setIsActive(!isActive);
 
   const adjustSetting = (type: 'focus' | 'break' | 'rounds', amount: number) => {
       setSubjectConfigs(prev => {
@@ -130,7 +175,7 @@ export default function HomeScreen() {
           let newBreak = config.break;
           let newRounds = config.rounds;
 
-          if (type === 'focus') newFocus = Math.max(1, config.focus + amount);
+          if (type === 'focus') newFocus = Math.max(5, config.focus + amount);
           else if (type === 'break') newBreak = Math.max(1, config.break + amount);
           else if (type === 'rounds') newRounds = Math.max(1, config.rounds + amount);
 
@@ -138,11 +183,23 @@ export default function HomeScreen() {
       });
   }
 
+  const handleSaveSettings = async () => {
+      try {
+          const userRef = doc(db, 'users', USER_ID);
+          await updateDoc(userRef, { subjectConfigs: subjectConfigs });
+          setModalVisible(false); 
+      } catch (error) {
+          console.error("Error saving settings: ", error);
+          alert("存檔失敗，請檢查網路連線。");
+      }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.header, { zIndex: 1000 }]}>
         <View style={styles.coinBadge}>
-          <Text style={styles.coinText}>🔥 30</Text>
+          {/* 🔥 顯示 Streak */}
+          <Text style={styles.coinText}>🔥 {streak}</Text>
         </View>
 
         <View style={styles.dropdownContainer}>
@@ -272,7 +329,7 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.confirmButton} onPress={() => setModalVisible(false)}>
+                <TouchableOpacity style={styles.confirmButton} onPress={handleSaveSettings}>
                   <Text style={styles.confirmButtonText}>Save Changes</Text>
                 </TouchableOpacity>
               </View>
@@ -280,7 +337,6 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-
     </SafeAreaView>
   )
 }
@@ -538,7 +594,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 16, 
     fontWeight: '800', 
     color: theme.colors.text1, 
-    width: 45, 
+    width: 55, 
     textAlign: 'center',
   },
 
