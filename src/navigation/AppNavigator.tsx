@@ -1,10 +1,12 @@
 import { StyleSheet } from 'react-native'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { auth } from '../../firebaseConfig';
 import { Octicons, MaterialCommunityIcons, MaterialIcons, AntDesign } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen'
-import ProfileScreen from '../screens/ProfileScreen'
+import MenuScreen from '../screens/MenuScreen'
 import RoomScreen from '../screens/RoomScreen'
 import CreateScheduleScreen from '../screens/CreateScheduleScreen'
 import StoreScreen from '../screens/StoreScreen'
@@ -56,7 +58,7 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
                     color={color}
                     />
                   )
-                  case 'Profile':
+                  case 'Menu':
                     return (
                       <AntDesign name="menu" size={24} color={color} />
                     )
@@ -67,8 +69,8 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
         <Tab.Screen name='Store' component={StoreScreen}/>
-        <Tab.Screen name='Profile'>
-          {(props) => <ProfileScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
+        <Tab.Screen name='Menu' options={{ headerShown: false}}>
+              {(props) => <MenuScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
         </Tab.Screen>
     </Tab.Navigator>
   )
@@ -76,6 +78,14 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
 
 export default function AppNavigator() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user)
+    })
+    return unsubscribe
+  }, [])
+
   return (
     <Stack.Navigator>
       {isLoggedIn ? (
