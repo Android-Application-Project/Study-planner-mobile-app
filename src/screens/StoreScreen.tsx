@@ -8,18 +8,18 @@ const screenWidth = Dimensions.get('window').width;
 const cardWidth = (screenWidth - 60 - 15) / 2;
 
 export default function StoreScreen() {
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [activeTab, setActiveTab] = useState<'themes' | 'animals'>('themes');
-  const [coins, setCoins] = useState(300);
+  const [coins, setCoins] = useState(600);
 
-  const mockThemes = [
+  const [mockThemes, setMockThemes] = useState([
     { id: 't1', name: 'Default', price: 0, color: '#84A98C', status: 'equipped' },
     { id: 't2', name: 'Ocean Blue', price: 150, color: '#64B5F6', status: 'owned' },
     { id: 't3', name: 'Royal Purple', price: 200, color: '#BA68C8', status: 'buyable' },
     { id: 't4', name: 'Dark Mode', price: 300, color: '#2F3E46', status: 'buyable' },
-  ];
+  ]);
 
   const mockAnimals = [
     { id: 'a1', name: 'Alex', icon: '🐱', price: 0, status: 'equipped' },
@@ -28,24 +28,70 @@ export default function StoreScreen() {
     { id: 'a4', name: 'Kermit', icon: '🐸', price: 250, status: 'buyable' },
   ];
 
-  const renderActionButton = (status: string, price: number) => {
-    if (status === 'equipped') {
+  const handleTheme = (item: any) => {
+    if (item.status === 'owned') {
+      let newTheme: 'blue' | 'purple' | 'darkBlue' | 'default' = 'default'
+      switch (item.id) {
+        case 't1': newTheme = 'default'; break
+        case 't2': newTheme = 'blue'; break
+        case 't3': newTheme = 'purple'; break
+        case 't4': newTheme = 'darkBlue'; break
+      }
+      setTheme(newTheme)
+
+      setMockThemes(prev =>
+        prev.map(themeItem => ({
+          ...themeItem,
+          status: themeItem.id === item.id 
+            ? 'equipped' 
+            : themeItem.status === 'equipped' 
+            ? 'owned' 
+            : themeItem.status
+        }))
+      )
+    }
+  }
+
+  const handleBuyTheme = (item: any) => {
+    if (coins >= item.price) {
+      setCoins(prev => prev - item.price);
+      setMockThemes(prev =>
+        prev.map(themeItem => ({
+          ...themeItem,
+          status: themeItem.id === item.id 
+            ? 'owned' 
+            : themeItem.status === 'equipped' 
+            ? 'equipped' 
+            : themeItem.status
+        }))
+      )
+    }
+  }
+
+  const renderActionButton = (item: any) => {
+    if (item.status === 'equipped') {
       return (
-        <View style={[styles.actionButton, styles.buttonEquipped]}>
+        <TouchableOpacity style={[styles.actionButton, styles.buttonEquipped]}>
           <Text style={[styles.actionButtonText, { color: theme.colors.text1 }]}>Equipped</Text>
-        </View>
+        </TouchableOpacity>
       );
-    } else if (status === 'owned') {
+    } else if (item.status === 'owned') {
       return (
-        <View style={[styles.actionButton, styles.buttonOwned]}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.buttonOwned]}
+          onPress={() => handleTheme(item)}
+        >
           <Text style={[styles.actionButtonText, { color: theme.colors.text1 }]}>Use</Text>
-        </View>
+        </TouchableOpacity>
       );
     } else {
       return (
-        <View style={[styles.actionButton, styles.buttonBuy]}>
-          <Text style={styles.actionButtonText}>🐟 {price}</Text>
-        </View>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.buttonBuy]} 
+          onPress={() => handleBuyTheme(item)}
+        >
+          <Text style={styles.actionButtonText}>🐟 {item.price}</Text>
+        </TouchableOpacity>
       );
     }
   };
@@ -64,7 +110,7 @@ export default function StoreScreen() {
         )}
         <View style={styles.cardInfo}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-          {renderActionButton(item.status, item.price)}
+          {renderActionButton(item)}
         </View>
       </TouchableOpacity>
     );

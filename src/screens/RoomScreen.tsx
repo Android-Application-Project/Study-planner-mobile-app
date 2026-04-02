@@ -10,7 +10,7 @@ import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes';
 
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../../firebaseConfig';
 
 export default function RoomScreen() {
     const navigation = useNavigation<any>();

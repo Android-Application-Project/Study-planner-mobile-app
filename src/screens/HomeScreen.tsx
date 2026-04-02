@@ -10,7 +10,7 @@ import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 
 import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase'; 
+import { db } from '../../firebaseConfig';
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 const getYesterdayStr = () => {

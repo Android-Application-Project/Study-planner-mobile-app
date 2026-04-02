@@ -38,12 +38,30 @@ export const DefaultTheme = {
   dark: false,
   fonts: navFonts,
   colors: {
+    primary: '#84A98C', 
+    secondary1: '#2F3E46', 
+    secondary2: '#CBF3BB',
+    text1: '#354F52',
+    text2: '#52796F',
+    card: '#baceac',   // #cddec3 
+    text: '#354F52',     
+    border: 'transparent',
+    notification: '#ff0000',
+    background: '#D6E0C9',
+  },
+};
+
+export const Default1Theme = {
+  name: 'default',
+  dark: false,
+  fonts: navFonts,
+  colors: {
     primary: '#84A98C',
     secondary1: '#2F3E46',
     secondary2: '#CBF3BB',
     text1: '#354F52',
     text2: '#52796F',
-    card: '#CBF3BB',      
+    card: '#C2D1B8',      
     text: '#354F52',     
     border: 'transparent',
     notification: '#ff0000',
@@ -86,10 +104,29 @@ export const PurpleTheme = {
   },
 }
 
+export const DarkBlueTheme = {
+  name: 'darkBlue',
+  dark: true,
+  fonts: navFonts,
+  colors: {
+    primary: '#215796',
+    secondary1: '#1E88E5',
+    secondary2: '#42A5F5',
+    text1: '#E3F2FD',
+    text2: '#90CAF9',
+    card: '#18324e',
+    text: '#E3F2FD',
+    border: '#1B263B',
+    notification: '#FF5252',
+    background: '#0A1929',
+  },
+};
+
 export const themes = {
   default: DefaultTheme,
   blue: BlueTheme,
-  purple: PurpleTheme
+  purple: PurpleTheme,
+  darkBlue: DarkBlueTheme
 };
 
 export type ThemeName = keyof typeof themes;
