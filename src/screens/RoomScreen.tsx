@@ -10,12 +10,14 @@ import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes';
 
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 
 export default function RoomScreen() {
     const navigation = useNavigation<any>();
     const { theme } = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
+
+    const currentUserId = auth.currentUser?.uid; 
 
     const [index, setIndex] = useState(0)
 
@@ -83,6 +85,11 @@ export default function RoomScreen() {
         return;
       }
 
+      if(!currentUserId){
+        alert("Error, cant find user ID, please login again");
+        return;
+      }
+
       const finalSubject = customSubject.trim() !== '' ? customSubject.trim() : (selectedSubjects[0] || 'Study');
       
       try {
@@ -97,7 +104,8 @@ export default function RoomScreen() {
           mode: roomMode,
           focusTime: roomMode === 'Shared' ? focusTime : null, 
           breakTime: roomMode === 'Shared' ? breakTime : null,
-          createdAt: serverTimestamp() 
+          createdAt: serverTimestamp(),
+          hostId: currentUserId
         });
 
         setModalVisible(false);
@@ -111,7 +119,7 @@ export default function RoomScreen() {
 
       } catch (error) {
         console.error("Error creating room: ", error);
-        alert("創建房間失敗，請檢查網路連線。");
+        alert("create room failed");
       }
     };
 

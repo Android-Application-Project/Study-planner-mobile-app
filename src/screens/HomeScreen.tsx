@@ -10,7 +10,7 @@ import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 
 import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 const getYesterdayStr = () => {
@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const USER_ID = "my_test_user_001"; 
+  const USER_ID = auth.currentUser?.uid;
 
   const [streak, setStreak] = useState(0);
   const [lastFocusDate, setLastFocusDate] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function HomeScreen() {
   const animatedTimeLeft = useRef(new Animated.Value(timeLeft)).current;
 
   useEffect(() => {
-    if (!db) return; 
+    if (!db || !USER_ID) return; 
     const userRef = doc(db, 'users', USER_ID);
 
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
@@ -143,7 +143,7 @@ export default function HomeScreen() {
             newStreak = 1;
           }
 
-          updateDoc(doc(db, 'users', USER_ID), {
+          updateDoc(doc(db, 'users', USER_ID as string), {
              streak: newStreak,
              lastFocusDate: today
           });
@@ -184,21 +184,22 @@ export default function HomeScreen() {
   }
 
   const handleSaveSettings = async () => {
-      try {
-          const userRef = doc(db, 'users', USER_ID);
-          await updateDoc(userRef, { subjectConfigs: subjectConfigs });
-          setModalVisible(false); 
-      } catch (error) {
-          console.error("Error saving settings: ", error);
-          alert("存檔失敗，請檢查網路連線。");
-      }
+    if (!USER_ID) return;
+
+    try {
+      const userRef = doc(db, 'users', USER_ID);
+      await updateDoc(userRef, { subjectConfigs: subjectConfigs });
+      setModalVisible(false); 
+    } catch (error) {
+      console.error("Error saving settings: ", error);
+      alert("save error");
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.header, { zIndex: 1000 }]}>
         <View style={styles.coinBadge}>
-          {/* 🔥 顯示 Streak */}
           <Text style={styles.coinText}>🔥 {streak}</Text>
         </View>
 
