@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme as NavDefaultTheme } from '@react-nav
 import AppNavigator from './src/navigation/AppNavigator';
 import ThemeProvider from './src/utils/ThemeProvider';
 import { useTheme } from './src/utils/ThemeProvider';
+import './src/utils/Notifications';
 
 function MainApp() {
   const { theme } = useTheme()
