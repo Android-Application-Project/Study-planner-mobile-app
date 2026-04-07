@@ -2,8 +2,9 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'reac
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeProvider'
-import { auth } from '../../firebaseConfig'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { db, auth } from '../../firebaseConfig'
+import { doc, setDoc } from 'firebase/firestore'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import Feather from '@expo/vector-icons/Feather';
 import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
@@ -12,6 +13,7 @@ import * as Google from 'expo-auth-session/providers/google'
 export default function registerScreen({ navigation, setIsLoggedIn }: { navigation: any, setIsLoggedIn: (value: boolean) => void }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const { theme } = useTheme()
@@ -38,8 +40,16 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
   async function handleRegister() {
     try {
       setError('')
-      await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      await updateProfile(userCredential.user, { displayName: username })
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        username: username,
+        email: email,
+        createdAt: new Date()
+      })
+
       setIsLoggedIn(true)
+
     } catch(err) {
       const error = err as FirebaseError
 
@@ -67,6 +77,13 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
         style={styles.input}
         value={email}
         onChangeText={setEmail}
+      />
+
+      <TextInput
+        placeholder='Username'
+        style={styles.input}
+        value={username}
+        onChangeText={setUsername}
       />
 
       <View style={styles.passwordContainer}>
@@ -161,7 +178,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   input: {
     width: '100%',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
@@ -179,7 +196,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: "#cddec3",
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     marginBottom: 15,
   },

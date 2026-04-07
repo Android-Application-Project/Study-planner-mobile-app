@@ -1,16 +1,21 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC_p--rTEfr6qxjpmZzb2TCO3u_plRKe7w",
-  authDomain: "studyplanner-bf053.firebaseapp.com",
-  projectId: "studyplanner-bf053",
-  storageBucket: "studyplanner-bf053.firebasestorage.app",
-  messagingSenderId: "722986819408",
-  appId: "1:722986819408:web:e20e22e11ac449319f9655"
+  apiKey: "AIzaSyC6P0p_wbBQCQ81aJStjIFiL5ygF2r4BiA",
+  authDomain: "study-planner-dfdfc.firebaseapp.com",
+  projectId: "study-planner-dfdfc",
+  storageBucket: "study-planner-dfdfc.firebasestorage.app",
+  messagingSenderId: "336827366518",
+  appId: "1:336827366518:web:1bc4c699872aa02cd33357"
 };
 
-const app = initializeApp(firebaseConfig);
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
+export const db = getFirestore(app)
+export const storage = getStorage(app)
 export default app;
