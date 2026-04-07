@@ -1,10 +1,11 @@
-import { StyleSheet } from 'react-native'
-import { useEffect, useState } from 'react'
+import { Alert, StyleSheet } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { auth } from '../../firebaseConfig';
-import { Octicons, MaterialCommunityIcons, MaterialIcons, AntDesign } from '@expo/vector-icons';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { auth, db } from '../../firebaseConfig';
+import { Octicons, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen'
 import MenuScreen from '../screens/MenuScreen'
 import RoomScreen from '../screens/RoomScreen'
@@ -16,6 +17,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import LogInScreen from '../screens/LogInScreen';
 import RoomForStudyTogether from '../screens/RoomForStudyTogether';
 import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
+import { configureNotificationChannelAsync, ensureNotificationPermissionsAsync } from '../utils/Notifications';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -33,7 +35,7 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
           case 'Social':
             return <MaterialCommunityIcons name={focused ? 'account-group-outline' : 'account-group'} size={31} color={color} />
           case 'Create':
-            return <MaterialIcons name={focused ? 'add-circle-outline' : 'add-circle'} size={30} color={color} />
+            return <MaterialCommunityIcons name={focused ? 'calendar-edit' : 'calendar-edit-outline'} size={30} color={color} />
           case 'Store':
             return <MaterialCommunityIcons name={focused ? 'storefront-outline' : 'storefront'} size={30} color={color} />
           case 'Menu':
@@ -54,10 +56,67 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
 
 export default function AppNavigator() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const promptedUserRef = useRef<string | null>(null)
 
   useEffect(() => {
+    const maybePromptForNotifications = async (userId: string) => {
+      if (promptedUserRef.current === userId) return
+      promptedUserRef.current = userId
+
+      const userRef = doc(db, 'users', userId)
+      const snapshot = await getDoc(userRef)
+      const data = snapshot.data()
+
+      if (data?.notificationPrompted) {
+        return
+      }
+
+      Alert.alert(
+        'Allow Notifications',
+        'Study Planner would like to send you notifications.',
+        [
+          {
+            text: "Don't Allow",
+            style: 'cancel',
+            onPress: async () => {
+              await setDoc(
+                userRef,
+                {
+                  notificationPrompted: true,
+                  notificationPreference: 'dismissed',
+                  notificationPromptedAt: serverTimestamp(),
+                },
+                { merge: true },
+              )
+            },
+          },
+          {
+            text: 'Allow',
+            onPress: async () => {
+              await configureNotificationChannelAsync()
+              const granted = await ensureNotificationPermissionsAsync()
+              await setDoc(
+                userRef,
+                {
+                  notificationPrompted: true,
+                  notificationPreference: granted ? 'enabled' : 'denied',
+                  notificationPromptedAt: serverTimestamp(),
+                },
+                { merge: true },
+              )
+            },
+          },
+        ],
+      )
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsLoggedIn(!!user)
+      if (user) {
+        void maybePromptForNotifications(user.uid)
+      } else {
+        promptedUserRef.current = null
+      }
     })
     return unsubscribe
   }, [])
