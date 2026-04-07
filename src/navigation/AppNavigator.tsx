@@ -14,6 +14,8 @@ import CalendarScreen from '../screens/CalendarScreen';
 import FirstScreen from '../screens/FirstScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import LogInScreen from '../screens/LogInScreen';
+import RoomForStudyTogether from '../screens/RoomForStudyTogether';
+import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -27,44 +29,18 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
       tabBarIcon: ({ focused, color }) => {
         switch (route.name) {
           case 'Home':
-            return (
-              <Octicons 
-              name={focused ? 'home' : 'home-fill'}
-              size={24} 
-              color={color}
-              />
-            )
-            case 'Social':
-              return (
-                <MaterialCommunityIcons 
-                name={focused ? 'account-group-outline' : 'account-group'} 
-                size={31} 
-                color={color}
-                />
-              )
-              case 'Create':
-                return (
-                  <MaterialIcons 
-                  name={focused ? 'add-circle-outline' : 'add-circle'}
-                  size={30} 
-                  color={color}
-                  />
-                )
-                case 'Store':
-                  return (
-                    <MaterialCommunityIcons 
-                    name={focused ? 'storefront-outline' : 'storefront'}
-                    size={30} 
-                    color={color}
-                    />
-                  )
-                  case 'Menu':
-                    return (
-                      <AntDesign name="menu" size={24} color={color} />
-                    )
-                  }
-                }
-              })}>
+            return <Octicons name={focused ? 'home' : 'home-fill'} size={24} color={color} />
+          case 'Social':
+            return <MaterialCommunityIcons name={focused ? 'account-group-outline' : 'account-group'} size={31} color={color} />
+          case 'Create':
+            return <MaterialIcons name={focused ? 'add-circle-outline' : 'add-circle'} size={30} color={color} />
+          case 'Store':
+            return <MaterialCommunityIcons name={focused ? 'storefront-outline' : 'storefront'} size={30} color={color} />
+          case 'Menu':
+            return <AntDesign name="menu" size={24} color={color} />
+        }
+      }
+    })}>
         <Tab.Screen name='Home' component={HomeScreen}/>       
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
@@ -94,20 +70,16 @@ export default function AppNavigator() {
             {(props) => <Tabs {...props} setIsLoggedIn={setIsLoggedIn} />}
           </Stack.Screen>          
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
+          <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{ headerShown: false}}/>
+          <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{ headerShown: false}}/>
         </>
       ) : (
         <>
           <Stack.Screen name='FirstScreen' component={FirstScreen} options={{ headerShown: false }}/>
-          <Stack.Screen
-            name='RegisterScreen'
-            options={{ headerShown: false }}
-          >
+          <Stack.Screen name='RegisterScreen' options={{ headerShown: false }}>
             {(props) => <RegisterScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
           </Stack.Screen>  
-          <Stack.Screen
-            name="LoginScreen"
-            options={{ headerShown: false }}
-          >
+          <Stack.Screen name="LoginScreen" options={{ headerShown: false }}>
             {(props) => <LogInScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
           </Stack.Screen>       
         </>
