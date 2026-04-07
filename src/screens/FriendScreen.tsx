@@ -155,7 +155,7 @@ export default function FriendScreen() {
           {item.isOnline && <View style={styles.onlineDot} />}
         </View>
         <View style={styles.infoContainer}>
-          <Text style={styles.friendName}>{item.name || 'Unknown User'}</Text>
+          <Text style={styles.friendName}>{item.name || item.username || 'Unknown User'}</Text>
           <Text style={[styles.friendStatus, { color: item.isOnline ? theme.colors.primary : theme.colors.text2 }]}>{item.status || 'Chilling'}</Text>
         </View>
         <View style={styles.streakContainer}><Text style={styles.streakText}>🔥 {item.streak || 0}</Text></View>
@@ -219,7 +219,7 @@ export default function FriendScreen() {
                     )
                   }
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name || 'Unknown User'}</Text>
+                      <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name || item.username || 'Unknown User'}</Text>
                       <Text style={{ color: theme.colors.text2, fontSize: 12 }}>wants to be your friend!</Text>
                     </View>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeclineRequest(item.id)}>
