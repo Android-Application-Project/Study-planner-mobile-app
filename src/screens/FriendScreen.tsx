@@ -5,7 +5,7 @@ import { Theme } from '../utils/Themes';
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
-import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 
 export default function FriendScreen() {
@@ -25,7 +25,7 @@ export default function FriendScreen() {
     let unsubscribePending: any = null;
 
     const myRef = doc(db, 'users', currentUserId);
-    const unsubscribeMe = onSnapshot(myRef, (docSnap) => {
+    const unsubscribeMe = onSnapshot(myRef, async (docSnap) => {
       if (docSnap.exists()){
         const myData = docSnap.data();
         const myFriendIds = myData.friendIds || [];
@@ -52,6 +52,15 @@ export default function FriendScreen() {
             setPendingRequests(pendingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           });
         }
+      } else {
+          await setDoc(myRef, {
+            username: auth.currentUser?.displayName || 'Google User',
+            email: auth.currentUser?.email || '',
+            name: auth.currentUser?.displayName || 'Unknown',
+            avatar: '👤',
+            friendIds: [],
+            pendingRequests: []
+          }, { merge: true });
       }
     });
 
