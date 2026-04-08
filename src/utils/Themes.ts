@@ -44,7 +44,7 @@ export const DefaultTheme = {
     text1: '#354F52',
     text2: '#52796F',
     card: '#baceac',   // #cddec3 
-    card2: '#f4f8f2',
+    text: '#354F52',
     border: 'transparent',
     notification: '#ff0000',
     background: '#D6E0C9',
