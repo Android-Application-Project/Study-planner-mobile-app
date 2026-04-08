@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native'
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -9,7 +9,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes';
 
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, where, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 
 export default function RoomScreen() {
@@ -35,7 +35,7 @@ export default function RoomScreen() {
     const [focusTime, setFocusTime] = useState(25);
     const [breakTime, setBreakTime] = useState(5);
 
-    const subjects = ['Math', 'English', 'Science', 'History', 'Design', 'Coding'];
+    const subjects = ['Math', 'English', 'German', 'Finnish', 'Design', 'Coding'];
     const memberOptions = [2, 4, 6, 8, 10]; 
 
     const subjectIcons: Record<string, string> = {
@@ -43,23 +43,50 @@ export default function RoomScreen() {
       'History': '🏺', 'Design': '🎨', 'Coding': '💻'
     };
     const [rooms, setRooms] = useState<any[]>([]);
+    const [isJoinModalVisible, setJoinModalVisible] = useState(false);
+    const [selectedRoomToJoin, setSelectedRoomToJoin] = useState<any>(null);
+    const [myJoinFocusTime, setMyJoinFocusTime] = useState(25);
+    const [myJoinBreakTime, setMyJoinBreakTime] = useState(5);
+    const [myJoinSubject, setMyJoinSubject] = useState('Study');
 
     useEffect(() => {
-        if (!db) return;
+      if(!db || !currentUserId) return;
 
-        const roomsRef = collection(db, 'rooms');
-        const q = query(roomsRef, orderBy('createdAt', 'desc'));
+      let unsubscribeRooms: any = null;
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedRooms = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+      const myRef = doc(db, 'users', currentUserId);
+      const unsubscribeMe = onSnapshot(myRef, (docSnap) => {
+        if (docSnap.exists()){
+          const myData = docSnap.data();
+          const myFriendIds = myData.friendIds || [];
+
+          const targetIds = [...myFriendIds, currentUserId];
+
+          const safeTargetIds = targetIds.slice(0, 30);
+
+          const roomsRef = collection (db, 'rooms');
+          const q = query(
+            roomsRef,
+            where('hostId', 'in', safeTargetIds),
+            orderBy('createdAt', 'desc')
+          );
+
+          if(unsubscribeRooms) unsubscribeRooms();
+
+          unsubscribeRooms = onSnapshot(q, (snapshot) => {
+            const fetchedRooms = snapshot.docs.map (d => ({
+              id: d.id,
+              ...d.data ()
             }));
             setRooms(fetchedRooms);
-        });
-
-        return () => unsubscribe();
-    }, []);
+          });
+        }
+      });
+      return () => {
+        unsubscribeMe();
+        if (unsubscribeRooms) unsubscribeRooms();
+      }
+    }, [currentUserId]);
 
     const toggleSubject = (subject: string) => {
       setSelectedSubjects([subject]);
@@ -93,6 +120,12 @@ export default function RoomScreen() {
       const finalSubject = customSubject.trim() !== '' ? customSubject.trim() : (selectedSubjects[0] || 'Study');
       
       try {
+        const userRef = doc(db, 'users', currentUserId);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? userSnap.data() : {};
+        const myAvatar = userData.avatar || '👤';
+        const myName = userData.name || userData.username || 'Unknown';
+
         const roomsRef = collection(db, 'rooms');
 
         await addDoc(roomsRef, {
@@ -105,7 +138,9 @@ export default function RoomScreen() {
           focusTime: roomMode === 'Shared' ? focusTime : null, 
           breakTime: roomMode === 'Shared' ? breakTime : null,
           createdAt: serverTimestamp(),
-          hostId: currentUserId
+          hostId: currentUserId,
+          hostAvatar: myAvatar,
+          hostName: myName
         });
 
         setModalVisible(false);
@@ -124,15 +159,39 @@ export default function RoomScreen() {
     };
 
     const handleJoinRoom = (item: any) => {
-      const targetScreen = item.mode === 'Shared' ? 'RoomForStudyTogether' : 'RoomForIndependentStudy';
-      navigation.navigate(targetScreen, {
-        roomId: item.id,
-        roomName: item.name,
-        subject: item.subject,
-        icon: item.icon,
-        focusTime: item.focusTime,
-        breakTime: item.breakTime
-      });
+      if(item.mode === 'Shared'){
+        navigation.navigate('RoomForStudyTogether', {
+          roomId: item.id,
+          roomName: item.name,
+          subject: item.subject,
+          icon: item.icon,
+          focusTime: item.focusTime,
+          breakTime: item.breakTime
+        });
+      } else {
+        setSelectedRoomToJoin(item);
+        setMyJoinSubject(item.subject);
+        setMyJoinFocusTime(25);
+        setMyJoinBreakTime(5);
+        setJoinModalVisible(true);
+      }
+    };
+
+    const confirmJoinIndependentRoom = () => {
+      setJoinModalVisible(false);
+      navigation.navigate('RoomForIndependentStudy', {
+        roomId: selectedRoomToJoin.id,
+        roomName: selectedRoomToJoin.name,
+        icon: selectedRoomToJoin.icon,
+        subject: myJoinSubject,
+        focusTime: myJoinFocusTime,
+        breakTime: myJoinBreakTime
+      })
+    }
+
+    const adjustJoinSetting = (type: 'focus' | 'break', amount: number) => {
+      if (type === 'focus') setMyJoinFocusTime(prev => Math.max(5, prev + amount));
+      if (type === 'break') setMyJoinBreakTime(prev => Math.max(1, prev + amount));
     };
 
     const renderRoomCard = ({ item }: any) => {
@@ -140,7 +199,11 @@ export default function RoomScreen() {
           <View style={styles.roomCard}>
             <View style={styles.cardContentSection}>
               <View style={styles.roomIconBg}>
-                <Text style={styles.roomIcon}>{item.icon}</Text>
+                {item.hostAvatar && item.hostAvatar.startsWith('http') ? (
+                  <Image source={{ uri: item.hostAvatar }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                ) : (
+                  <Text style={styles.roomIcon}>{item.hostAvatar || '👤'}</Text>
+                )}
               </View>
               
               <View style={styles.roomInfoColumn}>
@@ -364,6 +427,67 @@ export default function RoomScreen() {
                   </View>
                 </ScrollView>
               </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        <Modal animationType="fade" transparent={true} visible={isJoinModalVisible} onRequestClose={() => setJoinModalVisible(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <Pressable style={styles.modalOverlayJoin} onPress={() => setJoinModalVisible(false)}>
+              <Pressable style={styles.modalContentJoin} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.modalHandle} />
+                
+                <Text style={styles.modalTitle}>Join {selectedRoomToJoin?.name}</Text>
+                <Text style={styles.modalSubtitle}>This is an independent room. Set your own goals!</Text>
+
+                <Text style={styles.inputLabel}>My Subject</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="What are you studying?"
+                  value={myJoinSubject}
+                  onChangeText={setMyJoinSubject}
+                />
+
+                <View style={styles.settingRow}>
+                  <View>
+                      <Text style={styles.inputLabel}>My Focus Time</Text>
+                  </View>
+                  <View style={styles.stepper}>
+                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('focus', -5)}>
+                          <Feather name="minus" size={20} color={theme.colors.text1} />
+                      </TouchableOpacity>
+                      <Text style={styles.stepText}>{myJoinFocusTime} m</Text>
+                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('focus', 5)}>
+                          <Feather name="plus" size={20} color={theme.colors.text1} />
+                      </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.settingRow}>
+                  <View>
+                      <Text style={styles.inputLabel}>My Break Time</Text>
+                  </View>
+                  <View style={styles.stepper}>
+                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('break', -1)}>
+                          <Feather name="minus" size={20} color={theme.colors.text1} />
+                      </TouchableOpacity>
+                      <Text style={styles.stepText}>{myJoinBreakTime} m</Text>
+                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('break', 1)}>
+                          <Feather name="plus" size={20} color={theme.colors.text1} />
+                      </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={() => setJoinModalVisible(false)}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmButton} onPress={confirmJoinIndependentRoom}>
+                    <Text style={styles.confirmButtonText}>Enter Room</Text>
+                  </TouchableOpacity>
+                </View>
+
+              </Pressable>
             </Pressable>
           </KeyboardAvoidingView>
         </Modal>
@@ -794,5 +918,19 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 16, 
     fontWeight: 'bold', 
     color: '#FFF' 
+  },
+
+  modalOverlayJoin: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', 
+    justifyContent: 'center', 
+    paddingHorizontal: 20 
+  },
+  modalContentJoin: { 
+    backgroundColor: '#F7F9F5', 
+    borderRadius: 35, 
+    paddingHorizontal: 30, 
+    paddingTop: 25, 
+    paddingBottom: 30 
   }
 });
