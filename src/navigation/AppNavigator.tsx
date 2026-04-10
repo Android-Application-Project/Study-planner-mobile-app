@@ -16,6 +16,8 @@ import RegisterScreen from '../screens/RegisterScreen';
 import LogInScreen from '../screens/LogInScreen';
 import RoomForStudyTogether from '../screens/RoomForStudyTogether';
 import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
+import StatisticsScreen from '../screens/StatisticsScreen';
+import SettingScreen from '../screens/SettingScreen';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -71,6 +73,8 @@ export default function AppNavigator() {
           </Stack.Screen>          
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
           <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{ headerShown: false}}/>
+          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{ headerShown: false}}/>
+          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{ headerShown: false}}/>
           <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{ headerShown: false}}/>
         </>
       ) : (

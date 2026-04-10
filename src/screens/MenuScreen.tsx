@@ -5,11 +5,12 @@ import { Theme } from '../utils/Themes'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { AuthProps } from '../types/Auth'
 import { auth, db } from '../../firebaseConfig'
-import { doc, onSnapshot, serverTimestamp, setDoc, getDoc } from 'firebase/firestore'
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
+import MenuLink from '../components/MenuLink'
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 
@@ -139,13 +140,6 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
 
             console.log('Firestore update successful')
 
-            // Add direct read to verify
-            const docSnap = await getDoc(docRef)
-            if (docSnap.exists()) {
-                const data = docSnap.data()
-                console.log('Direct read after update:', data.avatar)
-            }
-
             setNamePopupVisible(false)
             setAvatarPopupVisible(false)
         } catch (err: any) {
@@ -198,6 +192,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                         subtitle="View your study analytics" 
                         styles={styles} 
                         iconBg="#A8C2A0"
+                        screen='StatisticsScreen'
                     />
                     <MenuLink 
                         icon="settings-outline" 
@@ -205,6 +200,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                         subtitle="App preferences & notifications" 
                         styles={styles} 
                         iconBg="#A8C2A0"
+                        screen='SettingScreen'
                     />
                     <MenuLink 
                         icon="document-text-outline" 
@@ -291,19 +287,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
     )
 }
 
-// Sub-component for Menu Items
-const MenuLink = ({ icon, title, subtitle, styles, iconBg }: any) => (
-    <TouchableOpacity style={styles.menuItem}>
-        <View style={[styles.menuIconContainer, {backgroundColor: iconBg}]}>
-            <Ionicons name={icon} size={22} color="#4A5D45" />
-        </View>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.menuItemTitle}>{title}</Text>
-            <Text style={styles.menuItemSubtitle}>{subtitle}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
-    </TouchableOpacity>
-)
+
 
 const createStyles = (theme: Theme) => StyleSheet.create({
     container: {
