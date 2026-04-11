@@ -1,10 +1,11 @@
-import { StyleSheet } from 'react-native'
-import { useEffect, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { Alert, StyleSheet, ActivityIndicator, View } from 'react-native'
+import { useEffect, useRef } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { auth } from '../../firebaseConfig';
-import { Octicons, MaterialCommunityIcons, MaterialIcons, AntDesign } from '@expo/vector-icons';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useAuth } from '../utils/AuthContext';
+import { db } from '../../firebaseConfig';
+import { Octicons, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen'
 import MenuScreen from '../screens/MenuScreen'
 import RoomScreen from '../screens/RoomScreen'
@@ -18,11 +19,12 @@ import RoomForStudyTogether from '../screens/RoomForStudyTogether';
 import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import SettingScreen from '../screens/SettingScreen';
+import { configureNotificationChannelAsync, ensureNotificationPermissionsAsync } from '../utils/Notifications';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
-function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
+function Tabs() {
   return (
     <Tab.Navigator 
     screenOptions={({ route }) => ({
@@ -35,7 +37,7 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
           case 'Social':
             return <MaterialCommunityIcons name={focused ? 'account-group-outline' : 'account-group'} size={31} color={color} />
           case 'Create':
-            return <MaterialIcons name={focused ? 'add-circle-outline' : 'add-circle'} size={30} color={color} />
+            return <MaterialCommunityIcons name={focused ? 'calendar-edit' : 'calendar-edit-outline'} size={30} color={color} />
           case 'Store':
             return <MaterialCommunityIcons name={focused ? 'storefront-outline' : 'storefront'} size={30} color={color} />
           case 'Menu':
@@ -47,30 +49,87 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
         <Tab.Screen name='Store' component={StoreScreen}/>
-        <Tab.Screen name='Menu' options={{ headerShown: false}}>
-              {(props) => <MenuScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
-        </Tab.Screen>
+        <Tab.Screen name='Menu' component={MenuScreen}/>
     </Tab.Navigator>
   )
 }
 
 export default function AppNavigator() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-
+  const { user, loading } = useAuth()
+  const promptedUserRef = useRef<string | null>(null)
+  
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user)
-    })
-    return unsubscribe
-  }, [])
+    const maybePromptForNotifications = async (userId: string) => {
+      if (promptedUserRef.current === userId) return
+      promptedUserRef.current = userId
+
+      const userRef = doc(db, 'users', userId)
+      const snapshot = await getDoc(userRef)
+      const data = snapshot.data()
+
+      if (data?.notificationPrompted) {
+        return
+      }
+
+      Alert.alert(
+        'Allow Notifications',
+        'Study Planner would like to send you notifications.',
+        [
+          {
+            text: "Don't Allow",
+            style: 'cancel',
+            onPress: async () => {
+              await setDoc(
+                userRef,
+                {
+                  notificationPrompted: true,
+                  notificationPreference: 'dismissed',
+                  notificationPromptedAt: serverTimestamp(),
+                },
+                { merge: true },
+              )
+            },
+          },
+          {
+            text: 'Allow',
+            onPress: async () => {
+              await configureNotificationChannelAsync()
+              const granted = await ensureNotificationPermissionsAsync()
+              await setDoc(
+                userRef,
+                {
+                  notificationPrompted: true,
+                  notificationPreference: granted ? 'enabled' : 'denied',
+                  notificationPromptedAt: serverTimestamp(),
+                },
+                { merge: true },
+              )
+            },
+          },
+        ],
+      )
+    }
+
+    if (user?.uid) {
+      void maybePromptForNotifications(user.uid)
+    } else {
+      promptedUserRef.current = null
+    }
+  }, [user?.uid])
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+  )
+}
 
   return (
     <Stack.Navigator>
-      {isLoggedIn ? (
+      {user ? (
         <>
-          <Stack.Screen name='Tabs' options={{ headerShown: false }}>
-            {(props) => <Tabs {...props} setIsLoggedIn={setIsLoggedIn} />}
-          </Stack.Screen>          
+          <Stack.Screen name='Tabs' component={Tabs} options={{ headerShown: false }}/>
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
           <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{ headerShown: false}}/>
           <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{ headerShown: false}}/>
@@ -81,10 +140,10 @@ export default function AppNavigator() {
         <>
           <Stack.Screen name='FirstScreen' component={FirstScreen} options={{ headerShown: false }}/>
           <Stack.Screen name='RegisterScreen' options={{ headerShown: false }}>
-            {(props) => <RegisterScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
+            {(props) => <RegisterScreen {...props} />}
           </Stack.Screen>  
           <Stack.Screen name="LoginScreen" options={{ headerShown: false }}>
-            {(props) => <LogInScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
+            {(props) => <LogInScreen {...props}/>}
           </Stack.Screen>       
         </>
       )}

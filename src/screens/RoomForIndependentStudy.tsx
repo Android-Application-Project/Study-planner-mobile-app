@@ -5,7 +5,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
 
 const EmojiAvatar = ({ emoji, size, bgColor }: { emoji: string, size: number, bgColor: string }) => {

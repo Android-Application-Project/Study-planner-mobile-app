@@ -1,11 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View, FlatList, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Image } from 'react-native'
 import React, { useMemo, useState, useEffect } from 'react'
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
-import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 
 export default function FriendScreen() {
@@ -25,7 +25,7 @@ export default function FriendScreen() {
     let unsubscribePending: any = null;
 
     const myRef = doc(db, 'users', currentUserId);
-    const unsubscribeMe = onSnapshot(myRef, (docSnap) => {
+    const unsubscribeMe = onSnapshot(myRef, async (docSnap) => {
       if (docSnap.exists()){
         const myData = docSnap.data();
         const myFriendIds = myData.friendIds || [];
@@ -52,6 +52,15 @@ export default function FriendScreen() {
             setPendingRequests(pendingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           });
         }
+      } else {
+          await setDoc(myRef, {
+            username: auth.currentUser?.displayName || 'Google User',
+            email: auth.currentUser?.email || '',
+            name: auth.currentUser?.displayName || 'Unknown',
+            avatar: '👤',
+            friendIds: [],
+            pendingRequests: []
+          }, { merge: true });
       }
     });
 
@@ -155,7 +164,7 @@ export default function FriendScreen() {
           {item.isOnline && <View style={styles.onlineDot} />}
         </View>
         <View style={styles.infoContainer}>
-          <Text style={styles.friendName}>{item.name || 'Unknown User'}</Text>
+          <Text style={styles.friendName}>{item.name || item.username || 'Unknown User'}</Text>
           <Text style={[styles.friendStatus, { color: item.isOnline ? theme.colors.primary : theme.colors.text2 }]}>{item.status || 'Chilling'}</Text>
         </View>
         <View style={styles.streakContainer}><Text style={styles.streakText}>🔥 {item.streak || 0}</Text></View>
@@ -219,7 +228,7 @@ export default function FriendScreen() {
                     )
                   }
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name || 'Unknown User'}</Text>
+                      <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name || item.username || 'Unknown User'}</Text>
                       <Text style={{ color: theme.colors.text2, fontSize: 12 }}>wants to be your friend!</Text>
                     </View>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeclineRequest(item.id)}>

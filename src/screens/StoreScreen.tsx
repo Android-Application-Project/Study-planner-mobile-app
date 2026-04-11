@@ -1,8 +1,11 @@
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Dimensions } from 'react-native'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
+import { auth } from '../../firebaseConfig';
+import { doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../../firebaseConfig';
 
 const screenWidth = Dimensions.get('window').width;
 const cardWidth = (screenWidth - 60 - 15) / 2;
@@ -11,8 +14,21 @@ export default function StoreScreen() {
   const { theme, setTheme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const uid = auth.currentUser?.uid;
+  if (!uid) return
+
   const [activeTab, setActiveTab] = useState<'themes' | 'animals'>('themes');
-  const [coins, setCoins] = useState(600);
+  const [coins, setCoins] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'users', uid), (docSnap) => {
+      if(docSnap.exists()) {
+        setCoins(docSnap.data().coins || 0)
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   const [mockThemes, setMockThemes] = useState([
     { id: 't1', name: 'Default', price: 0, color: '#84A98C', status: 'equipped' },

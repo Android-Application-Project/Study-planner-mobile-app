@@ -1,38 +1,18 @@
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { auth } from '../../firebaseConfig'
 import { signInWithEmailAndPassword } from 'firebase/auth'
-import * as Google from 'expo-auth-session/providers/google'
-import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
 import Feather from '@expo/vector-icons/Feather';
 
-export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation: any; setIsLoggedIn: (value: boolean) => void }) {
+export default function LogInScreen({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: googleAuthConfig.webClientId,
-    iosClientId: googleAuthConfig.iosClientId,
-    scopes: ['profile', 'email']
-  })
-
-  const handleGoogle = async () => {
-    try {
-      setError('')
-      const result = await signInWithGoogle(promptAsync)
-      if (result) setIsLoggedIn(true)
-    } catch (err) {
-      console.log('Error handleGoogle: ', err)
-      setError('Google sign-in failed')
-      setIsLoggedIn(false)
-    }
-  }
 
   async function handleLogin() {
     if (!email || !password) {
@@ -42,10 +22,8 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
     try {
       setError('')
       await signInWithEmailAndPassword(auth, email, password)
-      setIsLoggedIn(true)
     } catch(err) {
       setError('Email or password is incorrect!')
-      setIsLoggedIn(false)
     }
   }
 
@@ -98,18 +76,6 @@ export default function LogInScreen({ navigation, setIsLoggedIn }: { navigation:
         <Text style={styles.orText}>or</Text>
         <View style={styles.orLine} />
       </View>
-
-      <TouchableOpacity
-        style={styles.button}
-        disabled={!request}
-        onPress={handleGoogle}
-      >
-        <Image
-          style={styles.icon}
-          source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-        />
-        <Text style={styles.text}>Sign in with Google</Text>
-      </TouchableOpacity>
 
       <View style={styles.signupContainer}>
         <Text style={styles.signupText}>Don't have an account?</Text>

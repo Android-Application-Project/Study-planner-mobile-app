@@ -6,10 +6,10 @@ import Entypo from '@expo/vector-icons/Entypo';
 import { Feather } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
 
-import { doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
@@ -145,7 +145,8 @@ export default function HomeScreen() {
 
           updateDoc(doc(db, 'users', USER_ID as string), {
              streak: newStreak,
-             lastFocusDate: today
+             lastFocusDate: today,
+             coins: increment(20)
           });
         }
       } else {

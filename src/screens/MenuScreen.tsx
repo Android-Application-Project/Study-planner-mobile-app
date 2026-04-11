@@ -1,10 +1,11 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, TextInput, Image } from 'react-native'
 import { useMemo, useState, useEffect } from 'react'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { AuthProps } from '../types/Auth'
+import { useAuth } from '../utils/AuthContext'
 import { auth, db } from '../../firebaseConfig'
+import { signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../supabaseConfig'
@@ -17,14 +18,15 @@ const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 type UserData = {
   username: string
   avatar: string
-  level: number
+  coins: number
 }
 
-export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
+export default function MenuScreen() {
+    const { user } = useAuth()
     const { theme } = useTheme()
     const styles = useMemo(() => createStyles(theme), [theme])
 
-    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...', level: 1 })
+    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...' })
     const [loading, setLoading] = useState(false)
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
@@ -41,7 +43,6 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData
-                console.log('onSnapshot fired, new avatar:', data.avatar)
                 setUserData(data)
                 setNewName(data.username)
             }
@@ -131,14 +132,10 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
             if (!user) throw new Error('No user is logged in')
             const docRef = doc(db, 'users', user.uid)
 
-            console.log('Updating Firestore:', field, value)
-
             await setDoc(docRef, {
                 [field]: value,
                 updatedAt: serverTimestamp()
             }, { merge: true })
-
-            console.log('Firestore update successful')
 
             setNamePopupVisible(false)
             setAvatarPopupVisible(false)
@@ -166,7 +163,6 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                             <Text style={styles.userName} onPress={() => setNamePopupVisible(true)}>{userData.username}</Text>
                             <Feather name="edit-3" size={20} color="white" />
                         </View>
-                        <Text style={styles.userLevel}>{userData.level <= 3 ? 'Newbie feeder' : 'Senior feeder'}</Text>
                     </View>
                 </View>
 
@@ -211,7 +207,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                     />
                 </View>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={() => setIsLoggedIn(false)}>
+                <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(auth)}>
                     <Ionicons name="exit-outline" size={20} color="#6B8E7D" style={{marginRight: 8}} />
                     <Text style={styles.logoutText}>Log Out</Text>
                 </TouchableOpacity>
@@ -277,8 +273,6 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                         >
                             <Text style={{ fontWeight: '600' }}>Close</Text>
                         </TouchableOpacity>
-
-                        
                     </View>
                 </View>
             </Modal>

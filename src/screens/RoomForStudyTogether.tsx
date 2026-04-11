@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
 
 // This is for firebase tomorrow
