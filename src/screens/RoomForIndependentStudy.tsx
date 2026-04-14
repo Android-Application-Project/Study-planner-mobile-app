@@ -36,28 +36,22 @@ export default function RoomForIndependentStudy() {
   const route = useRoute<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-
   const { roomId, roomName, icon } = route.params || {};
   const currentUserId = auth.currentUser?.uid;
-
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
   const [focusMinutes, setFocusMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [totalSessions, setTotalSessions] = useState(4);
   const [currentSession, setCurrentSession] = useState(1);
   const [subject, setSubject] = useState('General Study');
-
   const [timeLeft, setTimeLeft] = useState(focusMinutes * 60); 
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false); 
-
   const [isChatModalVisible, setChatModalVisible] = useState(false);
   const [isSoundModalVisible, setSoundModalVisible] = useState(false);
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
-
   const [selectedSoundId, setSelectedSoundId] = useState('none');
   const soundObject = useRef<Audio.Sound | null>(null);
   const animatedTimeLeft = useRef(new Animated.Value(focusMinutes * 60)).current;
