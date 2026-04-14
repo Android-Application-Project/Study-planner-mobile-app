@@ -5,6 +5,9 @@ import { AuthProvider } from './src/utils/AuthContext'
 import ThemeProvider from './src/utils/ThemeContext';
 import { useTheme } from './src/utils/ThemeContext';
 import './src/utils/Notifications';
+import { useEffect } from 'react';
+import { DevSettings } from 'react-native';
+import { injectTestDataForGraph } from 'src/utils/TestData';
 
 function MainApp() {
   const { theme } = useTheme()
@@ -29,6 +32,13 @@ function MainApp() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (__DEV__) {
+      DevSettings.addMenuItem('Inject Graph Test Data', () => {
+        injectTestDataForGraph();
+      });
+    }
+  }, []);
   return (
     <SafeAreaProvider>
       <ThemeProvider>
