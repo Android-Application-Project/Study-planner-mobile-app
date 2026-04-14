@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native'
 import Entypo from '@expo/vector-icons/Entypo'
 import { Feather } from '@expo/vector-icons'
 import DropDownPicker from 'react-native-dropdown-picker'
+import Svg, { Circle, G } from 'react-native-svg'  // 👈 THÊM IMPORT NÀY
 
 import { useTheme } from '../utils/ThemeProvider'
 import { Theme } from '../utils/Themes'
@@ -68,121 +69,65 @@ const snap = (raw: number) =>
 const getTodayStr     = () => new Date().toISOString().split('T')[0]
 const getYesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0] }
 
-// ─── Smooth Progress Ring ─────────────────────────────────────────────────────
-// Uses the half-disc rotation technique: two solid D-shaped discs (right + left),
-// each clipped to their half of the container, rotating from -180° → 0° to reveal
-// the arc progressively. Zero segments = mathematically smooth circle edges.
+// ─── Progress Ring Styles (đơn giản hóa) ─────────────────────────────────────
 const ringS = StyleSheet.create({
-  outer: { position: 'absolute', width: CIRCLE_SIZE, height: CIRCLE_SIZE },
-
-  // Primary ring — always drawn underneath (360° arc)
-  track: {
+  outer: { 
+    position: 'absolute', 
+    width: CIRCLE_SIZE, 
+    height: CIRCLE_SIZE,
+    zIndex: 1,
+  },
+  svgContainer: {
     position: 'absolute',
-    left: DISC_OFFSET, top: DISC_OFFSET,
-    width: DISC_SIZE, height: DISC_SIZE,
-    borderRadius: RING_OUTER_R,
-    borderWidth: RING_WIDTH,
-    backgroundColor: 'transparent',
-  },
-
-  // CRITICAL: circular clip contains the D-disc's rotating square corners.
-  // Without this, sharp corners at (0,0) and (0,280) sweep past radius 140
-  // (they sit at √2·140 ≈ 198 from centre) and visibly square off the ring.
-  outerClip: {
-    position: 'absolute',
-    left: DISC_OFFSET, top: DISC_OFFSET,
-    width: DISC_SIZE, height: DISC_SIZE,
-    borderRadius: RING_OUTER_R,
-    overflow: 'hidden',
-  },
-
-  // Right / left halves live INSIDE outerClip — coords are relative to outerClip
-  rightClip: {
-    position: 'absolute', right: 0, top: 0,
-    width: RING_OUTER_R, height: DISC_SIZE,
-    overflow: 'hidden',
-  },
-  rightDisc: {
-    position: 'absolute',
-    left: -RING_OUTER_R, top: 0,
-    width: DISC_SIZE, height: DISC_SIZE,
-    borderTopRightRadius: RING_OUTER_R,
-    borderBottomRightRadius: RING_OUTER_R,
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-  },
-  leftClip: {
-    position: 'absolute', left: 0, top: 0,
-    width: RING_OUTER_R, height: DISC_SIZE,
-    overflow: 'hidden',
-  },
-  leftDisc: {
-    position: 'absolute',
-    left: 0, top: 0,
-    width: DISC_SIZE, height: DISC_SIZE,
-    borderTopLeftRadius: RING_OUTER_R,
-    borderBottomLeftRadius: RING_OUTER_R,
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-
-  // Inner mask — punches the centre hole
-  innerMask: {
-    position: 'absolute',
-    left: CIRCLE_RADIUS - RING_INNER_R, top: CIRCLE_RADIUS - RING_INNER_R,
-    width: RING_INNER_R * 2, height: RING_INNER_R * 2,
-    borderRadius: RING_INNER_R,
+    top: 0,
+    left: 0,
   },
 })
 
+// ─── Progress Ring Component (SVG version) ────────────────────────────────────
 interface ProgressRingProps { fillMinutes: number; theme: Theme }
 const ProgressRing = React.memo(({ fillMinutes, theme }: ProgressRingProps) => {
-  const fillAngle  = minutesToAngle(fillMinutes)
-  const trackColor = theme.dark ? '#1e2e1e' : '#C4D0BB'
-  const fillColor  = theme.colors.primary
+  const fillAngle = minutesToAngle(fillMinutes)
+  const trackColor = theme.dark ? '#2a2a2a' : '#E8EDE4'
+  const fillColor = theme.colors.primary
 
-  // COVER approach:
-  //   1. Draw the FULL primary ring (360° arc) underneath.
-  //   2. Place two grey D-shaped cover discs on top — one per half.
-  //   3. Rotate each cover CCW to reveal the primary ring progressively.
-  //
-  // rightCoverRot = -min(fillAngle, 180):
-  //   0° → cover sits at 12-o'clock clip edge  → hides 0°–180°  (no fill visible)
-  //  -θ° → cover rotates CCW by θ              → reveals 0°–θ° of the ring
-  // -180° → cover rotated fully away           → reveals entire right half
-  //
-  // leftCoverRot = -max(fillAngle-180, 0): same logic for the left half.
-  //
-  // The cover's straight diameter edge, when rotated, creates a clean RADIAL cut
-  // at exactly the fill-angle position (perpendicular to the ring band) — this is
-  // the arc's "butt cap" endpoint. The handle dot visually covers it.
-
-  const rightCoverRot = `${-Math.min(fillAngle, 180)}deg`
-  const leftCoverRot  = `${-Math.max(fillAngle - 180, 0)}deg`
+  // SVG circle properties
+  const radius = RING_CENTER_R
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference * (1 - fillAngle / 360)
 
   return (
     <View style={ringS.outer}>
-      {/* Full primary ring — 360° arc, always drawn underneath */}
-      <View style={[ringS.track, { borderColor: fillColor }]} />
+      {/* Track ring (background) */}
+      <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={ringS.svgContainer}>
+        <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
+          <Circle
+            cx={CIRCLE_RADIUS}
+            cy={CIRCLE_RADIUS}
+            r={radius}
+            stroke={trackColor}
+            strokeWidth={RING_WIDTH}
+            fill="none"
+          />
+        </G>
+      </Svg>
 
-      {/* Right grey cover — rotates CCW to uncover the right arc */}
-      <View style={ringS.rightClip}>
-        <View style={[ringS.rightDisc, {
-          backgroundColor: trackColor,
-          transform: [{ rotate: rightCoverRot }],
-        }]} />
-      </View>
-
-      {/* Left grey cover — rotates CCW to uncover the left arc */}
-      <View style={ringS.leftClip}>
-        <View style={[ringS.leftDisc, {
-          backgroundColor: trackColor,
-          transform: [{ rotate: leftCoverRot }],
-        }]} />
-      </View>
-
-      {/* Inner mask — punches the centre hole, hides solid disc interiors */}
-      <View style={[ringS.innerMask, { backgroundColor: theme.colors.background }]} />
+      {/* Fill ring (progress) */}
+      <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={ringS.svgContainer}>
+        <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
+          <Circle
+            cx={CIRCLE_RADIUS}
+            cy={CIRCLE_RADIUS}
+            r={radius}
+            stroke={fillColor}
+            strokeWidth={RING_WIDTH}
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        </G>
+      </Svg>
     </View>
   )
 })
@@ -290,7 +235,7 @@ export default function HomeScreen() {
     return () => { if (iv) clearInterval(iv) }
   }, [isActive, timeLeft, isBreak, currentConfig, currentRound, streak, lastFocusDate])
 
-  // ─── PanResponder ──────────────────────────────────────────────────────────
+  // ─── PanResponder (Fixed) ──────────────────────────────────────────────────
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt) => {
@@ -321,17 +266,24 @@ export default function HomeScreen() {
 
         // Smooth wrap-around at 0°/360° boundary
         if (prevDragAngleRef.current !== null) {
-          const diff = angle - prevDragAngleRef.current
-          if (diff > 180)  angle -= 360
-          if (diff < -180) angle += 360
+          let diff = angle - prevDragAngleRef.current
+          if (diff > 180) {
+            angle -= 360
+            diff = angle - prevDragAngleRef.current
+          }
+          if (diff < -180) {
+            angle += 360
+            diff = angle - prevDragAngleRef.current
+          }
           angle = Math.max(0, Math.min(360, angle))
         }
         prevDragAngleRef.current = angle
 
         // Raw → snap to nearest 5-min step
-        const rawMin    = MIN_MINUTES + (angle / 360) * (MAX_MINUTES - MIN_MINUTES)
-        const snapped   = snap(rawMin)
-        const subject   = valueRef.current
+        let rawMin = MIN_MINUTES + (angle / 360) * (MAX_MINUTES - MIN_MINUTES)
+        rawMin = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, rawMin))
+        const snapped = snap(rawMin)
+        const subject = valueRef.current
 
         setSubjectConfigs(prev => ({
           ...prev,
@@ -424,7 +376,7 @@ export default function HomeScreen() {
         style={styles.timerContainer}
         {...panResponder.panHandlers}
       >
-        {/* 1. Smooth progress ring (half-disc rotation — perfectly round edges) */}
+        {/* 1. Progress ring (SVG version) */}
         <ProgressRing fillMinutes={currentConfig.focus} theme={theme} />
 
         {/* 2. Emoji in centre */}
@@ -432,7 +384,7 @@ export default function HomeScreen() {
           <Text style={styles.animalImage}>{isBreak ? '💤' : '🐱'}</Text>
         </View>
 
-        {/* 6. Draggable handle dot */}
+        {/* 3. Draggable handle dot */}
         <View
           style={[styles.sliderHandle, {
             left: handlePos.x - HANDLE_SIZE / 2,
@@ -563,6 +515,7 @@ const createStyles = (theme: Theme) =>
     centerContent: {
       position: 'absolute',
       alignItems: 'center', justifyContent: 'center',
+      zIndex: 2,
     },
     animalImage: { fontSize: 92 },
 
@@ -576,7 +529,7 @@ const createStyles = (theme: Theme) =>
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.3, shadowRadius: 6, elevation: 8,
-      zIndex: 10,
+      zIndex: 999,
     },
 
     // Countdown
