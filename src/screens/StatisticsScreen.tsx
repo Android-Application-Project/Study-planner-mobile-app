@@ -2,7 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, Dimensions, View, ScrollView } from
 import { useState, useEffect, useMemo } from 'react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
-import { LineChart, PieChart } from 'react-native-chart-kit'
+import { LineChart, PieChart, BarChart } from 'react-native-chart-kit'
 import { useTheme } from '../utils/ThemeContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Theme } from 'src/utils/Themes'
@@ -22,33 +22,21 @@ type SmartScheduleSessions = {
   title: string
 }
 
-
-
 export default function StatisticsScreen() {
   const { theme } = useTheme()
   const uid = auth.currentUser?.uid;
   const styles = createStyles(theme)
 
-  const [chartData, setChartData] = useState<{ labels: string[]; data: number[] }>({
-    labels: [],
-    data: []
-  })
-
-  const [pieData, setPieData] = useState<({ completed: number, skipped: number })>({ completed: 0, skipped: 0 })
-
-  const [tooltip, setTooltip] = useState({
-    visible: false,
-    value: 0,
-    x: 0,
-    y: 0,
-  })
+  const [sessions, setSessions] = useState<SmartScheduleSessions[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tooltip, setTooltip] = useState({ visible: false, value: 0, x: 0, y: 0 })
 
   const lineChartConfig = {
-    backgroundGradientFrom: theme.colors.card,
-    backgroundGradientTo: theme.colors.card,
+    backgroundGradientFrom: theme.colors.background,
+    backgroundGradientTo: theme.colors.background,
     decimalPlaces: 0, 
     color: (opacity = 1) => `rgba(53, 79, 82, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(53, 79, 82, ${opacity})`,
+    labelColor: (opacity = 1) => theme.colors.text1,
     style: { borderRadius: 16 },
     propsForDots: {
       r: '6',
@@ -60,47 +48,93 @@ export default function StatisticsScreen() {
       dy: 3,
       dx: -10 
     },
-  };
-
+  }
+  
   const StatCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <View style={styles.card}>
-    <Text style={styles.cardTitle}>{title}</Text>
-    <View style={styles.chartWrapper}>{children}</View>
-  </View>
-)
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.chartWrapper}>{children}</View>
+    </View>
+  )
 
   useEffect(() => {
     const loadData = async () => {
       if (!uid) return
-
-      const sessions = await getSchedule(uid)
-
-      if (!Array.isArray(sessions)) return
-      
-      const dailyMinutes = getDailyMinutes(sessions)
-      const chartData = formatChartData(dailyMinutes)
-      
-      setChartData(chartData)
-
-      const stats = getSessionStats(sessions)
-      setPieData(stats)
+      setLoading(true)
+      try {
+        const sessions = await getSchedule(uid)
+        setSessions(sessions)
+      } catch (error) {
+        console.error("Failed to load schedule", error)
+      } finally {
+        setLoading(false)
+      }
     }
     loadData()
   }, [uid])
 
+  const lineData = useMemo(() => {
+    if (sessions.length === 0) return { labels: [], data: [] }
+    const dailyMinutes = getDailyMinutes(sessions)
+    return formatChartData(dailyMinutes)
+  }, [sessions])
+
+  const pieData = useMemo(() => {
+    return getSessionStats(sessions)
+  }, [sessions])
+
+  const barData = useMemo(() => {
+    if (sessions.length === 0) return null
+
+    const countsByDate = getSessionCounts(sessions)
+    const sortedDates = Object.keys(countsByDate).sort()
+
+    return {
+      labels: sortedDates.map(dateStr => {
+        const [y, m, d] = dateStr.split('-').map(Number)
+        const dateObj = new Date(y, m - 1, d)
+
+        const todayStr = new Date().toISOString().split('T')[0]
+        return dateStr === todayStr
+          ? 'Today'
+          : dateObj.toLocaleDateString(
+            'en-GB', {
+              day: 'numeric',
+              month: 'short'
+            }
+          )
+      }),
+      datasets: [
+        {
+          data: sortedDates.map(date => countsByDate[date])
+        }
+      ]
+    }
+  }, [sessions])
+
+  const maxSessions = useMemo(() => {
+    if (!barData) return 1
+    const vals = barData.datasets[0].data
+    return Math.max(...vals, 1)
+  }, [barData])
+
+  const segments = maxSessions < 15 ? maxSessions : 10
+
+  if (loading) return <View style={styles.container}><Text>Loading stats...</Text></View>;
+
   async function getSchedule(uid: string) {
     const ref = doc(db, 'users', uid)
     const snapShot = await getDoc(ref)
-
+    
     if (!snapShot.exists()) return []
     const data = snapShot.data()
-
+    
     const smartSchedule = data.smartSchedules || []
-
+    
     const sessions = smartSchedule.flatMap(
       (schedule: any) => schedule.sessions || []
     ) 
-
+    
     return sessions || []
   }
 
@@ -126,7 +160,6 @@ export default function StatisticsScreen() {
     })
 
     return result
-
   }
 
   function formatChartData(dailyMinutes: Record<string, number>) {
@@ -145,15 +178,31 @@ export default function StatisticsScreen() {
   }
 
   function getSessionStats(sessions: SmartScheduleSessions[]) {
-    let completed = 0
-    let skipped = 0
+    return sessions.reduce((acc, s) => {
+      if (s.completed) acc.completed++
+      if (s.skipped) acc.skipped++
+      return acc
+    }, { completed: 0, skipped: 0 })
+  }
 
-    sessions.forEach(s => {
-      if (s.completed === true) completed++
-      if (s.skipped === true) skipped++
+  function getSessionCounts(sessions: SmartScheduleSessions[]) {
+    const result: Record<string, number> = {}
+    const today = new Date()
+
+    for (let i = -2; i <= 2; i++) {
+      const day = new Date()
+      day.setDate(today.getDate() + i)
+      const dateStr = day.toISOString().split('T')[0]
+      result[dateStr] = 0
+    }
+
+    sessions.forEach(session => {
+      if (result[session.date] !== undefined) {
+        result[session.date] += 1
+      }
     })
 
-    return { completed, skipped }
+    return result
   }
 
   return (
@@ -161,13 +210,39 @@ export default function StatisticsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.headerTitle}>Learning Analytics</Text>
 
+        <StatCard title='Session load (5 current days)'>
+          {barData ? (
+            <BarChart
+              data={barData}
+              width={screenWidth - 60}
+              height={220}
+              segments={segments}
+              yAxisLabel=''
+              yAxisSuffix=''
+              fromZero={true}
+              showValuesOnTopOfBars={true}
+              chartConfig={{
+                backgroundGradientFrom: theme.colors.background,
+                backgroundGradientTo: theme.colors.background,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(53, 79, 82, ${opacity})`,
+                labelColor: (opacity = 1) => theme.colors.text1,
+                barPercentage: 0.6,
+              }}
+              style={{ marginVertical: 8, borderRadius: 16, marginRight: 40 }}
+            />
+          ) : (
+            <Text style={styles.noData}>No sessions found in schedule.</Text>
+          )}
+        </StatCard>
+
         <StatCard title='Study minutes (Past 7 days)'>
-          {chartData.data.length > 0 ? (
+          {lineData.data.length > 0 ? (
             <View>
               <LineChart
                 data={{
-                  labels: chartData.labels,
-                  datasets: [{ data: chartData.data }] 
+                  labels: lineData.labels,
+                  datasets: [{ data: lineData.data }] 
                 }}
                 width={screenWidth - 60}
                 height={220}
@@ -190,7 +265,7 @@ export default function StatisticsScreen() {
           )}
         </StatCard>
 
-      <StatCard title="Completion Overview">
+        <StatCard title="Completion Overview">
           {pieData.completed + pieData.skipped > 0 ? (
             <PieChart
               data={[
@@ -221,6 +296,8 @@ export default function StatisticsScreen() {
           )}
         </StatCard>
 
+        
+
         {tooltip.visible && (
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
@@ -248,14 +325,16 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 24,
     padding: 16,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderBottomColor: theme.colors.text1,
+    borderBottomWidth: 2,
+    // shadowColor: '#000',
+    // shadowOffset: { width: 0, height: 4 },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 8,
+    // backgroundColor: theme.colors.card,
+    borderRadius: 16,
   },
   cardTitle: {
     fontSize: 16,
