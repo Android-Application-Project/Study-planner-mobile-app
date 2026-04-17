@@ -21,6 +21,20 @@ type UserData = {
   coins: number
 }
 
+type SmartScheduleSessions = {
+  completed: boolean
+  date: string
+  day: string
+  end: string
+  focusType: string
+  icons: string
+  minutes: number
+  notificationId: string
+  room: string
+  skipped: boolean
+  title: string
+}
+
 export default function MenuScreen() {
     const { theme } = useTheme()
     const styles = useMemo(() => createStyles(theme), [theme])
@@ -158,7 +172,7 @@ export default function MenuScreen() {
         .filter(session => session.completed)
         .reduce(( sum, session ) => sum + session.minutes, 0)
 
-    const completedHours = Math.round(completedMinutes / 60)
+    const completedHours = (completedMinutes / 60).toFixed(1)
 
     return (
         <SafeAreaView style={styles.container}>
@@ -194,6 +208,7 @@ export default function MenuScreen() {
                         <Text style={styles.statLabel}>Total Hours</Text>
                     </View>
                 </View>
+
 
                 <View style={styles.menuList}>
                     <MenuLink 
@@ -294,8 +309,6 @@ export default function MenuScreen() {
         </SafeAreaView>
     )
 }
-
-
 
 const createStyles = (theme: Theme) => StyleSheet.create({
     container: {

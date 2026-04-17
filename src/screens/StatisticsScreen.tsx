@@ -22,6 +22,30 @@ type SmartScheduleSessions = {
   title: string
 }
 
+function ProgressBar({ progress }: { progress: number}) {
+  return (
+    <View style={{ margin: 20 }}>
+      <View
+        style={{
+          height: 15,
+          width: "100%",
+          backgroundColor: "#eee",
+          borderRadius: 10,
+          overflow: "hidden"
+        }}
+      >
+        <View
+          style={{
+            height: "100%",
+            width: `${progress * 100}%`,
+            backgroundColor: "#4CAF50"
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function StatisticsScreen() {
   const { theme } = useTheme()
   const styles = createStyles(theme)
@@ -100,6 +124,16 @@ export default function StatisticsScreen() {
     return Math.max(...vals, 1)
   }, [barData])
 
+  const deadlineProgress = useMemo(() => {
+    const groups = groupByTitle(sessions)
+
+    return Object.keys(groups).map(title => {
+      const progress = getDeadlineProgress(groups[title])
+
+      return { title, ...progress }
+    })
+  }, [sessions])
+
   const segments = maxSessions < 15 ? maxSessions : 10
 
   if (loading) return <View style={styles.container}><Text>Loading stats...</Text></View>;
@@ -146,9 +180,10 @@ export default function StatisticsScreen() {
   function getSessionStats(sessions: SmartScheduleSessions[]) {
     return sessions.reduce((acc, s) => {
         if (s.completed) acc.completed++
-        if (s.skipped) acc.skipped++  
+        else if (s.skipped) acc.skipped++  
+        else acc.upComming++
         return acc
-    }, { completed: 0, skipped: 0 })
+    }, { completed: 0, skipped: 0, upComming: 0 })
   }
 
   function getSessionCounts(sessions: SmartScheduleSessions[]) {
@@ -171,10 +206,69 @@ export default function StatisticsScreen() {
     return result
   }
 
-  return (
+  function getDeadlineProgress(sessions: SmartScheduleSessions[]) {
+    let completedMinutes = 0
+    let totalMinutes = 0
+
+    sessions.forEach(session => {
+      totalMinutes += session.minutes
+      if (session.completed) completedMinutes += session.minutes
+    })
+
+    const progress = totalMinutes == 0
+      ? 0
+      : completedMinutes / totalMinutes
+
+    return { completedMinutes, totalMinutes, progress }
+  }
+
+  function groupByTitle(sessions: SmartScheduleSessions[]) {
+    const result: Record<string, SmartScheduleSessions[]> = {}
+
+    sessions.forEach(session => {
+      if (!result[session.title]) result[session.title] = []
+      result[session.title].push(session)
+    })
+
+    return result
+  }
+
+  function getColor(progress: number) {
+    if (progress < 0.3) return "#F44336";
+    if (progress < 0.7) return "#FFC107";
+    return "#4CAF50";
+  }
+
+
+
+  return ( 
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.headerTitle}>Learning Analytics</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Deadline Progress</Text>
+          {deadlineProgress.map((item, index) => (
+            <View key={index} style={styles.progressCard}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <Text style={{ fontWeight: "bold" }}>
+                  {item.title}
+                </Text>
+
+                <Text style={{ fontWeight: "bold", color: getColor(item.progress) }}>
+                  {Math.round(item.progress * 100)}%
+                </Text>
+              </View>
+              <ProgressBar progress={item.progress} />
+            </View>
+          ))}
+        </View>
 
         <StatCard title='Session load (5 current days)'>
           {barData ? (
@@ -249,20 +343,25 @@ export default function StatisticsScreen() {
                   legendFontColor: theme.colors.text1,
                   legendFontSize: 12,
                 },
+                {
+                  name: 'Up comming',
+                  population: pieData.upComming,
+                  color: '#936944',
+                  legendFontColor: theme.colors.text1,
+                  legendFontSize: 12,
+                },
               ]}
               width={screenWidth - 60}
               height={180}
               accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
+              paddingLeft="5"
               chartConfig={lineChartConfig}
             />
           ) : (
             <Text style={styles.noData}>Complete a session to see stats!</Text>
           )}
         </StatCard>
-
-        
 
         {tooltip.visible && (
           <TouchableOpacity
@@ -300,7 +399,6 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     // shadowOpacity: 0.1,
     // shadowRadius: 8,
     // backgroundColor: theme.colors.card,
-    borderRadius: 16,
   },
   cardTitle: {
     fontSize: 16,
@@ -343,4 +441,8 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  progressCard: {
+    marginBottom: 10,
+    marginHorizontal: 20
+  }
 })

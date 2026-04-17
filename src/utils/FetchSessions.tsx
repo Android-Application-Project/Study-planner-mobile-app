@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { db, auth } from "firebaseConfig"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, onSnapshot } from "firebase/firestore"
 import { useAuth } from "./AuthContext"
 
 type SmartScheduleSessions = {
@@ -30,36 +30,39 @@ export function FetchSessions({ children }: any) {
     const { user } = useAuth()
 
     useEffect(() => {
-        const loadData = async () => {
-        if (!user) return
-        setLoading(true)
-        try {
-            const sessions = await getSchedule(user.uid)
-            setSessions(sessions)
-        } catch (error) {
-            console.error("Failed to load schedule", error)
-        } finally {
+        if (!user) {
+            setSessions([])
             setLoading(false)
+            return
         }
-        }
-        loadData()
-    }, [user])
 
-    async function getSchedule(uid: string) {
-        const ref = doc(db, 'users', uid)
-        const snapShot = await getDoc(ref)
-        
-        if (!snapShot.exists()) return []
-        const data = snapShot.data()
-        
-        const smartSchedule = data.smartSchedules || []
-        
-        const sessions = smartSchedule.flatMap(
-            (schedule: any) => schedule.sessions || []
-        ) 
-        
-        return sessions || []
-    }
+        setLoading(true)
+
+        const docRef = doc(db, 'users', user.uid)
+
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data()
+                const schedules = data.smartSchedules || []
+
+                const allSessions = schedules.flatMap(
+                    (schedule: SessionContextType) => schedule.sessions || []
+                )
+
+                setSessions(allSessions)
+            } else {
+                setSessions([])
+            }
+
+            setLoading(false)
+        }, (error) => {
+            console.error('Error listening to schedule: ', error)
+            setLoading(false)
+        })
+
+        return () => unsubscribe()
+
+    }, [user])
 
     return (
         <SessionContext.Provider value={{ sessions, loading }}>

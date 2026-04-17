@@ -54,20 +54,6 @@ function Tabs() {
   )
 }
 
-type SmartScheduleSessions = {
-  completed: boolean
-  date: string
-  day: string
-  end: string
-  focusType: string
-  icons: string
-  minutes: number
-  notificationId: string
-  room: string
-  skipped: boolean
-  title: string
-}
-
 export default function AppNavigator() {
   const { user, loading } = useAuth()
   const promptedUserRef = useRef<string | null>(null)
@@ -145,10 +131,10 @@ export default function AppNavigator() {
         <>
           <Stack.Screen name='Tabs' component={Tabs} options={{ headerShown: false }}/>
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
-          <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{ headerShown: false}}/>
-          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{ headerShown: false}}/>
-          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{ headerShown: false}}/>
-          <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{ headerShown: false}}/>
+          <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{headerTitle: ''}}/>
+          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{headerTitle: ''}}/>
+          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{headerTitle: ''}}/>
+          <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{headerTitle: ''}}/>
         </>
       ) : (
         <>
