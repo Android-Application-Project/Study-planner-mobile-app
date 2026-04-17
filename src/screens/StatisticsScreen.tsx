@@ -1,11 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, Dimensions, View, ScrollView } from 'react-native'
-import { useState, useEffect, useMemo } from 'react'
-import { doc, getDoc } from 'firebase/firestore'
-import { db, auth } from '../../firebaseConfig'
+import { useState, useMemo } from 'react'
 import { LineChart, PieChart, BarChart } from 'react-native-chart-kit'
 import { useTheme } from '../utils/ThemeContext'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Theme } from 'src/utils/Themes'
+import { useSessions } from 'src/utils/FetchSessions'
+
 const screenWidth = Dimensions.get('window').width
 
 type SmartScheduleSessions = {
@@ -24,11 +24,9 @@ type SmartScheduleSessions = {
 
 export default function StatisticsScreen() {
   const { theme } = useTheme()
-  const uid = auth.currentUser?.uid;
   const styles = createStyles(theme)
 
-  const [sessions, setSessions] = useState<SmartScheduleSessions[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { sessions, loading } = useSessions()
   const [tooltip, setTooltip] = useState({ visible: false, value: 0, x: 0, y: 0 })
 
   const lineChartConfig = {
@@ -56,22 +54,6 @@ export default function StatisticsScreen() {
       <View style={styles.chartWrapper}>{children}</View>
     </View>
   )
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (!uid) return
-      setLoading(true)
-      try {
-        const sessions = await getSchedule(uid)
-        setSessions(sessions)
-      } catch (error) {
-        console.error("Failed to load schedule", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [uid])
 
   const lineData = useMemo(() => {
     if (sessions.length === 0) return { labels: [], data: [] }
@@ -122,22 +104,6 @@ export default function StatisticsScreen() {
 
   if (loading) return <View style={styles.container}><Text>Loading stats...</Text></View>;
 
-  async function getSchedule(uid: string) {
-    const ref = doc(db, 'users', uid)
-    const snapShot = await getDoc(ref)
-    
-    if (!snapShot.exists()) return []
-    const data = snapShot.data()
-    
-    const smartSchedule = data.smartSchedules || []
-    
-    const sessions = smartSchedule.flatMap(
-      (schedule: any) => schedule.sessions || []
-    ) 
-    
-    return sessions || []
-  }
-
   function getDailyMinutes(sessions: SmartScheduleSessions[]) {
     const result: Record<string, number> = {}
     const today = new Date()
@@ -179,9 +145,9 @@ export default function StatisticsScreen() {
 
   function getSessionStats(sessions: SmartScheduleSessions[]) {
     return sessions.reduce((acc, s) => {
-      if (s.completed) acc.completed++
-      if (s.skipped) acc.skipped++
-      return acc
+        if (s.completed) acc.completed++
+        if (s.skipped) acc.skipped++  
+        return acc
     }, { completed: 0, skipped: 0 })
   }
 

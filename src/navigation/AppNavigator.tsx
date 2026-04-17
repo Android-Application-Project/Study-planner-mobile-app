@@ -54,6 +54,20 @@ function Tabs() {
   )
 }
 
+type SmartScheduleSessions = {
+  completed: boolean
+  date: string
+  day: string
+  end: string
+  focusType: string
+  icons: string
+  minutes: number
+  notificationId: string
+  room: string
+  skipped: boolean
+  title: string
+}
+
 export default function AppNavigator() {
   const { user, loading } = useAuth()
   const promptedUserRef = useRef<string | null>(null)

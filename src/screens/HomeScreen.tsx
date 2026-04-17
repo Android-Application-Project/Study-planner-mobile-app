@@ -54,6 +54,8 @@ export default function HomeScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const animatedTimeLeft = useRef(new Animated.Value(timeLeft)).current;
 
+  const [username, setUsername] = useState('')
+
   useEffect(() => {
     if (!db || !USER_ID) return; 
     const userRef = doc(db, 'users', USER_ID);
@@ -64,6 +66,8 @@ export default function HomeScreen() {
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
         if (data.subjectConfigs) setSubjectConfigs(data.subjectConfigs);
+
+        setUsername(data.username)
       } else {
         setDoc(userRef, {
           streak: 0, 
@@ -74,6 +78,9 @@ export default function HomeScreen() {
     });
     return () => unsubscribe(); 
   }, []);
+
+
+  console.log(username)
 
   const rotateAnimation = animatedTimeLeft.interpolate({
     inputRange: [0, (isBreak ? currentConfig.break : currentConfig.focus) * 60],

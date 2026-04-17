@@ -3,7 +3,6 @@ import { useMemo, useState, useEffect } from 'react'
 import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useAuth } from '../utils/AuthContext'
 import { auth, db } from '../../firebaseConfig'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
@@ -12,6 +11,7 @@ import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
 import MenuLink from '../components/MenuLink'
+import { useSessions } from 'src/utils/FetchSessions'
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 
@@ -22,21 +22,23 @@ type UserData = {
 }
 
 export default function MenuScreen() {
-    const { user } = useAuth()
     const { theme } = useTheme()
     const styles = useMemo(() => createStyles(theme), [theme])
 
+    const { sessions } = useSessions()
+
     const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...' })
-    const [loading, setLoading] = useState(false)
+    const [avatarLoading, setAvatarLoading] = useState(false)
+    const [usernameLoading, setUsernameLoading] = useState(false)
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
     const [avatarPopupVisible, setAvatarPopupVisible] = useState(false)
     
-    const[newName, setNewName] = useState('')
+    const[newName, setNewName] = useState('')   
 
     useEffect(() => {
         const user = auth.currentUser
-        if (!user) return
+        if (!user) throw new Error('No user is logged in')
 
         const docRef = doc(db, 'users', user.uid)
 
@@ -78,7 +80,7 @@ export default function MenuScreen() {
     }
 
     const uploadImage = async (uri: string) => {
-        setLoading(true)
+        setAvatarLoading(true)
         try {
             const user = auth.currentUser
             if (!user) return
@@ -120,13 +122,14 @@ export default function MenuScreen() {
             console.error('Upload error: ', err)
             Alert.alert('Upload failed', err.message)
         } finally {
-            setLoading(false)
+            setAvatarLoading(false)
         }
     } 
 
     const handleUpdate = async (field: 'username' | 'avatar', value: string) => {
         if (!value.trim()) return Alert.alert('Error', 'Field cannot be empty')
-        setLoading(true)
+        setAvatarLoading(true)
+        setUsernameLoading(true)
         try {
             const user = auth.currentUser
             if (!user) throw new Error('No user is logged in')
@@ -142,9 +145,20 @@ export default function MenuScreen() {
         } catch (err: any) {
             Alert.alert('Error updating profile', err.message)
         } finally {
-            setLoading(false)
+            setAvatarLoading(false)
+            setUsernameLoading(false)
         }
     }
+
+    const completedRatio = sessions.length > 0
+        ? Math.round((sessions.filter( session => session.completed).length / sessions.length) * 100)
+        : 0
+
+    const completedMinutes = sessions
+        .filter(session => session.completed)
+        .reduce(( sum, session ) => sum + session.minutes, 0)
+
+    const completedHours = Math.round(completedMinutes / 60)
 
     return (
         <SafeAreaView style={styles.container}>
@@ -160,24 +174,24 @@ export default function MenuScreen() {
                     </TouchableOpacity>
                     <View>
                         <View style={styles.editName}>
-                            <Text style={styles.userName} onPress={() => setNamePopupVisible(true)}>{userData.username}</Text>
-                            <Feather name="edit-3" size={20} color="white" />
+                            <Text style={styles.userName}>{userData.username}</Text>
+                            <Feather name="edit-3" size={20} color="white" onPress={() => setNamePopupVisible(true)}/>
                         </View>
                     </View>
                 </View>
 
                 <View style={styles.statsRow}>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>48h</Text>
+                        <Text style={styles.statValue}>12</Text>
                         <Text style={styles.statLabel}>This Week</Text>
                     </View>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>85%</Text>
+                        <Text style={styles.statValue}>{completedRatio}%</Text>
                         <Text style={styles.statLabel}>Completed</Text>
                     </View>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>142</Text>
-                        <Text style={styles.statLabel}>Total</Text>
+                        <Text style={styles.statValue}>{completedHours}</Text>
+                        <Text style={styles.statLabel}>Total Hours</Text>
                     </View>
                 </View>
 
@@ -235,9 +249,9 @@ export default function MenuScreen() {
                             <TouchableOpacity
                                 style={styles.saveBtn}
                                 onPress={() => handleUpdate('username', newName)}
-                                disabled={loading}
+                                disabled={usernameLoading}
                             >
-                                {loading ? <ActivityIndicator color={theme.colors.text1}/> : <Text style={styles.saveBtnText}>Save</Text>}
+                                {usernameLoading ? <ActivityIndicator color={theme.colors.text1}/> : <Text style={styles.saveBtnText}>Save</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -252,8 +266,8 @@ export default function MenuScreen() {
                             source={{ uri: userData.avatar || DEFAULT_AVATAR}}
                             style={styles.avatarImage}
                         />
-                        <TouchableOpacity style={styles.uploadOption} onPress={pickImage} disabled={loading}>
-                            {loading ? (
+                        <TouchableOpacity style={styles.uploadOption} onPress={pickImage} disabled={avatarLoading}>
+                            {avatarLoading ? (
                                 <ActivityIndicator color="#007AFF" />
                             ) : (
                                 <>
@@ -269,7 +283,7 @@ export default function MenuScreen() {
                         <TouchableOpacity
                             style={styles.cancelBtn2}
                             onPress={() => setAvatarPopupVisible(false)}
-                            disabled={loading}    
+                            disabled={avatarLoading}    
                         >
                             <Text style={{ fontWeight: '600' }}>Close</Text>
                         </TouchableOpacity>

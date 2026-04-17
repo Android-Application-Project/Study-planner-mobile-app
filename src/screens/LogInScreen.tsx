@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
+import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native'
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
 import { useTheme } from '../utils/ThemeContext'
