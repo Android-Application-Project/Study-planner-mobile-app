@@ -169,6 +169,7 @@ export default function RoomForIndependentStudy() {
   const handleAngle = minutesToAngle(focusMinutes);
   const handlePos = polarToXY(handleAngle, RING_CENTER_R);
 
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>

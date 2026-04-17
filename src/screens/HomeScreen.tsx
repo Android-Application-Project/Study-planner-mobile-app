@@ -14,7 +14,6 @@ import { Theme } from '../utils/Themes'
 
 const { width } = Dimensions.get('window');
 
-// --- 圓環與計時常量 ---
 const CIRCLE_SIZE = 300;
 const CIRCLE_RADIUS = CIRCLE_SIZE / 2;
 const RING_CENTER_R = 125;
@@ -23,7 +22,6 @@ const HANDLE_SIZE = 28;
 const MAX_MINUTES = 120;
 const STEP_MINUTES = 5;
 
-// --- 寵物數據定義 (嚴格對應你的 PNG 檔名) ---
 const PETS_DATA = {
   elephant: {
     name: 'Elephant',
@@ -71,7 +69,6 @@ export default function HomeScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const USER_ID = auth.currentUser?.uid;
 
-  // --- 狀態控制 ---
   const [streak, setStreak] = useState(0);
   const [lastFocusDate, setLastFocusDate] = useState<string | null>(null);
   const [currentMode, setCurrentMode] = useState('Study');
@@ -101,8 +98,6 @@ export default function HomeScreen() {
   const soundObject = useRef<Audio.Sound | null>(null);
   const timerViewRef = useRef<View>(null);
   const circleCenterRef = useRef({ x: 0, y: 0 });
-
-  // --- 1. 定義輔助函數 (必須放在使用它們的 Effect 之前) ---
 
   const getTodayStr = () => new Date().toISOString().split('T')[0];
   const getYesterdayStr = () => {
@@ -134,6 +129,7 @@ export default function HomeScreen() {
         status: currentMode,
         timeLeft: timeLeft,
         isFocusing: isActive && !isBreak,
+        selectedPetId: selectedPetId,
       });
     } catch (e) { console.log(e); }
   };
@@ -147,14 +143,11 @@ export default function HomeScreen() {
     const totalSeconds = focusMinutes * 60;
     const percentageLeft = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 100;
 
-    if (percentageLeft > 70) return petData.stages.baby; // 前30%
-    if (percentageLeft <= 20) return petData.stages.adult; // 最後20%
-    return petData.stages.child; // 中間
+    if (percentageLeft > 70) return petData.stages.baby; 
+    if (percentageLeft <= 20) return petData.stages.adult; 
+    return petData.stages.child;
   };
 
-  // --- 2. 使用效果 (Effects) ---
-
-  // Firebase 數據監聽與 Streak 重置檢查
   useEffect(() => {
     if (!USER_ID) return;
     const userRef = doc(db, 'users', USER_ID);
@@ -164,6 +157,10 @@ export default function HomeScreen() {
         const data = snap.data();
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
+
+        if (data.selectedPetId){
+          setSelectedPetId(data.selectedPetId)
+        }
       }
     });
 
@@ -186,7 +183,6 @@ export default function HomeScreen() {
     return () => unsub();
   }, [USER_ID]);
 
-  // 計時器邏輯
   useEffect(() => {
     let iv: any = null;
     if (isActive && timeLeft > 0) {
@@ -208,16 +204,12 @@ export default function HomeScreen() {
     return () => clearInterval(iv);
   }, [isActive, timeLeft, isBreak, currentRound, totalRounds]);
 
-  // 同步狀態
   useEffect(() => { syncToFirebase(); }, [currentMode, isActive, isBreak, selectedPetId]);
 
-  // 音頻設置
   useEffect(() => {
     Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, staysActiveInBackground: true });
     return () => { if (soundObject.current) soundObject.current.unloadAsync(); };
   }, []);
-
-  // --- 3. 交互處理器 ---
 
   const handleToggleTimer = () => {
     if (isActive && !isBreak) {
@@ -271,11 +263,57 @@ export default function HomeScreen() {
   const handleX = CIRCLE_RADIUS + RING_CENTER_R * Math.cos(rad);
   const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
 
-  // --- 4. 渲染 UI ---
+  const renderPetOption = ({ item }: { item: any }) => {
+    const isUnlocked = item.id === 'elephant'; 
+    const isSelected = selectedPetId === item.id;
+
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.petOptionCard, 
+          isSelected && isUnlocked && styles.petOptionCardActive,
+          !isUnlocked && { opacity: 0.4 }
+        ]}
+        onPress={() => {
+          if (isUnlocked) {
+            setSelectedPetId(item.id);
+          } else {
+            Alert.alert("Locked", `${item.name} is not unlocked yet! Visit the store later.`);
+          }
+        }}
+      >
+        <Image 
+          source={item.stages.adult} 
+          style={[
+            styles.petOptionImage,
+            !isUnlocked && { tintColor: '#666' } // 沒解鎖圖片變灰
+          ]} 
+          resizeMode="contain" 
+        />
+        <Text style={[
+          styles.petOptionName, 
+          isSelected && isUnlocked && { color: '#FFF' }
+        ]}>
+          {item.name}
+        </Text>
+
+        {!isUnlocked && (
+          <View style={{ position: 'absolute', top: 10, right: 10 }}>
+            <FontAwesome5 name="lock" size={14} color="#999" />
+          </View>
+        )}
+
+        {isSelected && isUnlocked && (
+          <View style={styles.checkBadge}>
+            <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.streakContainer}>
           <FontAwesome5 name="fire" size={18} color="#FF6B00" />
@@ -296,7 +334,6 @@ export default function HomeScreen() {
 
       <Text style={styles.statusTitle}>{isActive ? (isBreak ? "Resting" : "Focusing") : "Set Goal"}</Text>
 
-      {/* Timer Circle */}
       <View ref={timerViewRef} onLayout={measureCenter} style={styles.timerContainer} {...panResponder.panHandlers}>
         <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
           <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
@@ -310,7 +347,6 @@ export default function HomeScreen() {
         {!isActive && <View style={[styles.sliderHandle, { left: handleX - HANDLE_SIZE / 2, top: handleY - HANDLE_SIZE / 2 }]} />}
       </View>
 
-      {/* Info Card */}
       <View style={styles.infoCard}>
         <Text style={styles.timeText}>{Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
         <TouchableOpacity style={styles.summaryBadge} onPress={() => setModalVisible(true)}>
@@ -333,15 +369,7 @@ export default function HomeScreen() {
               numColumns={2}
               columnWrapperStyle={{justifyContent: 'space-between'}}
               keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={[styles.petOptionCard, selectedPetId === item.id && styles.petOptionCardActive]}
-                  onPress={() => setSelectedPetId(item.id)}
-                >
-                  <Image source={item.stages.adult} style={styles.petOptionImage} resizeMode="contain" />
-                  <Text style={[styles.petOptionName, selectedPetId === item.id && {color: '#FFF'}]}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
+              renderItem={renderPetOption}
             />
             <TouchableOpacity style={styles.confirmBtn} onPress={() => setPetModalVisible(false)}>
               <Text style={{color:'#FFF', fontWeight:'bold'}}>Confirm</Text>
@@ -350,7 +378,6 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* ⚙️ 2. 計時設定 Modal */}
       <Modal visible={isModalVisible} animationType="slide" transparent>
         <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
@@ -379,7 +406,6 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* 🎵 3. 環境音效 Modal */}
       <Modal visible={isSoundModalVisible} animationType="fade" transparent>
         <Pressable style={styles.modalOverlay} onPress={() => setSoundModalVisible(false)}>
           <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
