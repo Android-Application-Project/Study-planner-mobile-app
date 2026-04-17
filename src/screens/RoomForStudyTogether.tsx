@@ -1,458 +1,488 @@
-import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing, FlatList } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing, FlatList, Image, Alert, Modal, Dimensions, ScrollView, TextInput, PanResponder, Pressable } from 'react-native'
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Feather, Ionicons } from '@expo/vector-icons';
-
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import Svg, { Circle, G } from 'react-native-svg';
+import { doc, onSnapshot, updateDoc, query, collection, orderBy, limit, getDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
 import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 
-// This is for firebase tomorrow
-// import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-// import { db, auth } from '../config/firebase';
+const { width } = Dimensions.get('window');
 
-const EmojiAvatar = ({ emoji, size, bgColor }: { emoji: string, size: number, bgColor: string }) => {
-  const radius = size / 2;
+const CIRCLE_SIZE = 220; 
+const CIRCLE_RADIUS = CIRCLE_SIZE / 2;
+const RING_CENTER_R = 90; 
+const RING_WIDTH = 22; 
+const HANDLE_SIZE = 24;
+const MIN_MINUTES = 0; 
+const MAX_MINUTES = 120;
+const STEP_MINUTES = 5;
+
+const AMBIENT_SOUNDS = [
+  { id: 'none', name: 'None', icon: 'volume-off' },
+  { id: 'rain', name: 'Rain', icon: 'weather-pouring', file: require('../assets/sounds/rain.mp3') },
+  { id: 'cafe', name: 'Cafe', icon: 'coffee', file: require('../assets/sounds/cafe.mp3') },
+  { id: 'forest', name: 'Forest', icon: 'tree', file: require('../assets/sounds/forest.mp3')  },
+];
+
+const ProfileAvatar = ({ avatar, size, bgColor }: { avatar: string, size: number, bgColor: string }) => {
   return (
-    <View style={{ width: size, height: size, borderRadius: radius, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
+    <View style={{ width: size, height: size, borderRadius: size/2, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+      {avatar && avatar.startsWith('http') ? <Image source={{ uri: avatar }} style={{ width: size, height: size }} /> : <Text style={{ fontSize: size * 0.4 }}>{avatar || '👤'}</Text>}
     </View>
   );
 };
 
-export default function RoomForStudyTogether() {
-  const navigation = useNavigation<any>()
-  const route = useRoute<any>()
+const minutesToAngle = (m: number) => ((m - MIN_MINUTES) / (MAX_MINUTES - MIN_MINUTES)) * 360;
+const polarToXY = (angle: number, radius: number) => {
+  const rad = (angle - 90) * (Math.PI / 180);
+  return { x: CIRCLE_RADIUS + radius * Math.cos(rad), y: CIRCLE_RADIUS + radius * Math.sin(rad) };
+};
+const pageToAngle = (px: number, py: number, cx: number, cy: number) => {
+  let a = Math.atan2(px - cx, -(py - cy)) * (180 / Math.PI);
+  return a < 0 ? a + 360 : a;
+};
+
+export default function RoomForIndependentStudy() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { roomId, roomName } = route.params || {};
+  const currentUserId = auth.currentUser?.uid;
 
-  const { roomId, roomName, subject, icon } = route.params || { roomId: 'mock-id', roomName: 'Lavender Room', subject: 'English', icon: '🌸' };
+  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const [members, setMembers] = useState([
-    { id: '1', name: 'Zhi Lin', emoji: '🦊', isHost: true, status: 'Ready' }, 
-    { id: '2', name: 'Jason', emoji: '🦁', isHost: false, status: 'Ready' },
-    { id: '3', name: 'Christopher', emoji: '🐼', isHost: false, status: 'Ready' },
-  ]);
-  const maxMembers = 4;
+  const [focusMinutes, setFocusMinutes] = useState(25);
+  const [breakMinutes, setBreakMinutes] = useState(5);
+  const [totalSessions, setTotalSessions] = useState(4);
+  const [currentSession, setCurrentSession] = useState(1);
+  const [subject, setSubject] = useState('Studying...');
 
-  const [focusMinutes, setFocusMinutes] = useState(25); 
-  const [breakMinutes, setBreakMinutes] = useState(5);  
-  
   const [timeLeft, setTimeLeft] = useState(focusMinutes * 60); 
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false); 
 
-  const animatedTimeLeft = useRef(new Animated.Value(timeLeft)).current;
+  const [isChatModalVisible, setChatModalVisible] = useState(false);
+  const [isSoundModalVisible, setSoundModalVisible] = useState(false);
+  const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
 
-  const rotateAnimation = animatedTimeLeft.interpolate({
-    inputRange: [0, (isBreak ? breakMinutes : focusMinutes) * 60],
-    outputRange: ['360deg', '0deg'],
-  });
+  const [selectedSoundId, setSelectedSoundId] = useState('none');
+  const soundObject = useRef<Audio.Sound | null>(null);
+
+  const timerViewRef = useRef<View>(null);
+  const circleCenterRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-
-    /* firebase for tomorrow
     if (!roomId) return;
-    const roomRef = doc(db, 'rooms', roomId);
-    const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const roomData = docSnap.data();
-            setMembers(roomData.members || []);
-            setIsActive(roomData.timerIsActive || false);
-            setIsBreak(roomData.isBreak || false);
-        }
+    const roomUnsub = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
+      if (snap.exists()) setActiveUsers(snap.data().activeUsers || []);
     });
-
-    // 3. leave the room (updateDoc + arrayRemove)
-    return () => {
-        unsubscribe(); 
-        // kick myself out of the room
-    };
-    */
+    return () => roomUnsub();
   }, [roomId]);
 
-  useEffect(() => {
-    Animated.timing(animatedTimeLeft, {
-      toValue: timeLeft,
-      duration: isActive && timeLeft > 0 ? 1000 : 0,
-      easing: Easing.linear,
-      useNativeDriver: true,
-    }).start();
-  }, [isActive, timeLeft, animatedTimeLeft]);
-
-  useEffect(() => {
-      let interval: any = null; 
-      if (isActive && timeLeft > 0) {
-        interval = setInterval(() => {
-          setTimeLeft(prevTime => prevTime - 1); 
-        }, 1000); 
-      } 
-      else if (isActive && timeLeft === 0) {
-        clearInterval(interval);
-        
-        const nextIsBreak = !isBreak;
-        setIsBreak(nextIsBreak);
-        const nextTime = (nextIsBreak ? breakMinutes : focusMinutes) * 60;
-        
-        setTimeLeft(nextTime);
-        animatedTimeLeft.setValue(nextTime);
-        
-        setIsActive(false); 
-        
-        setMembers(prev => prev.map(m => ({ ...m, status: nextIsBreak ? 'Resting' : 'Ready' })));
-      }
-      return () => clearInterval(interval);
-  }, [isActive, timeLeft, isBreak, focusMinutes, breakMinutes, animatedTimeLeft]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const syncMyStatus = async () => {
+    if (!currentUserId || !roomId) return;
+    const roomRef = doc(db, 'rooms', roomId);
+    const roomSnap = await getDoc(roomRef);
+    if (roomSnap.exists()) {
+      const users = roomSnap.data().activeUsers || [];
+      const updatedUsers = users.map((u: any) => u.id === currentUserId ? { ...u, subject, status: isActive ? (isBreak ? 'Resting' : 'Focusing') : 'Paused', timeLeft, currentSession, totalSessions } : u);
+      await updateDoc(roomRef, { activeUsers: updatedUsers });
+    }
   };
 
-  const handleToggleTimer = () => {
-    const newIsActive = !isActive;
-    
-    // here is for the fire base
-    /*
-    const roomRef = doc(db, 'rooms', roomId);
-    updateDoc(roomRef, {
-        timerIsActive: newIsActive,
-        isBreak: isBreak,
-        
-    });
-    */
+  useEffect(() => { syncMyStatus(); }, [isActive, isBreak]);
 
-    setIsActive(newIsActive);
-    if (newIsActive) {
-        setMembers(prev => prev.map(m => ({ ...m, status: isBreak ? 'Resting' : 'Focusing' })));
-    } else {
-        setMembers(prev => prev.map(m => ({ ...m, status: 'Paused' })));
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt) => {
+        if (isActive) return false;
+        const { pageX, pageY } = evt.nativeEvent;
+        const { x: cx, y: cy } = circleCenterRef.current;
+        const d = Math.hypot(pageX - cx, pageY - cy);
+        return d > 60 && d < 130; 
+      },
+      onPanResponderMove: (evt) => {
+        const { pageX, pageY } = evt.nativeEvent;
+        const { x: cx, y: cy } = circleCenterRef.current;
+        let angle = pageToAngle(pageX, pageY, cx, cy);
+        let rawMin = (angle / 360) * MAX_MINUTES;
+        const snapped = Math.round(rawMin / 5) * 5;
+        setFocusMinutes(snapped);
+        if (!isBreak) setTimeLeft(snapped * 60);
+      },
+      onPanResponderRelease: syncMyStatus
+    })
+  ).current;
+
+  useEffect(() => {
+    let iv: any = null;
+    if (isActive && timeLeft > 0) {
+      iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    } else if (isActive && timeLeft === 0) {
+      let nextIsBreak = !isBreak;
+      let nextSession = isBreak ? currentSession + 1 : currentSession;
+      if (nextSession > totalSessions && !nextIsBreak) {
+        setIsActive(false); setIsBreak(false); setTimeLeft(focusMinutes * 60); setCurrentSession(1);
+        Alert.alert("Awesome! Room complete!");
+      } else {
+        setIsBreak(nextIsBreak); setCurrentSession(nextSession);
+        setTimeLeft((nextIsBreak ? breakMinutes : focusMinutes) * 60);
+        setIsActive(false);
+      }
+      syncMyStatus();
     }
-  }
+    return () => clearInterval(iv);
+  }, [isActive, timeLeft]);
 
-  const renderMember = ({ item }: any) => (
-    <View style={styles.memberCard}>
-      <EmojiAvatar size={44} emoji={item.emoji} bgColor='#E5EDDF' />
-      <View style={styles.memberInfo}>
-        <View style={styles.memberNameRow}>
-            <Text style={styles.memberName}>{item.name}</Text>
-            {item.isHost && <Text style={styles.hostBadge}>Host</Text>}
-        </View>
-        <Text style={[
-            styles.memberStatus, 
-            { color: item.status === 'Focusing' ? theme.colors.primary : theme.colors.text2 }
-        ]}>
-            {item.status}
-        </Text>
-      </View>
-      {item.status === 'Focusing' ? (
-        <Feather name="clock" size={20} color={theme.colors.primary} />
-      ) : item.status === 'Resting' ? (
-        <Text style={{fontSize: 18}}>☕️</Text>
-      ) : (
-        <Feather name="check-circle" size={20} color="#4CAF50" />
-      )}
-    </View>
-  );
+  useEffect(() => {
+    Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, staysActiveInBackground: true });
+    return () => { if (soundObject.current) soundObject.current.unloadAsync(); };
+  }, []);
+
+  const handleSoundSelect = async (soundId: string) => {
+    if (soundObject.current) { await soundObject.current.unloadAsync(); soundObject.current = null; }
+    setSelectedSoundId(soundId);
+    const selected = AMBIENT_SOUNDS.find(s => s.id === soundId);
+    if (soundId !== 'none' && selected?.file) {
+      const { sound } = await Audio.Sound.createAsync(selected.file, { shouldPlay: true, isLooping: true, volume: 0.5 });
+      soundObject.current = sound;
+    }
+  };
+
+  const measureCenter = () => timerViewRef.current?.measure((_fx, _fy, w, h, px, py) => {
+    circleCenterRef.current = { x: px + w / 2, y: py + h / 2 };
+  });
+
+  const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  const circumference = 2 * Math.PI * RING_CENTER_R;
+  const currentDisplayMinutes = isActive ? (timeLeft / 60) : focusMinutes;
+  const progressRatio = currentDisplayMinutes / MAX_MINUTES;
+  const strokeDashoffset = circumference * (1 - progressRatio);
+  const handleAngle = minutesToAngle(focusMinutes);
+  const handlePos = polarToXY(handleAngle, RING_CENTER_R);
+
 
   return (
     <SafeAreaView style={styles.container}>
-      
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text1} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Feather name="arrow-left" size={24} color={theme.colors.text1} />
         </TouchableOpacity>
         
-        <View style={styles.titleContainer}>
-            <View style={styles.headerNameRow}>
-                <Text style={styles.roomIconText}>{icon}</Text>
-                <Text style={styles.roomTitleText}>{roomName}</Text>
-            </View>
-            <View style={styles.subjectPill}>
-                <Text style={styles.subjectPillText}>{subject}</Text>
-            </View>
-        </View>
+        <Text style={styles.roomHeaderTitle} numberOfLines={1}>{roomName}</Text>
         
-        <TouchableOpacity style={styles.iconButton}>
-          <Feather name="more-horizontal" size={24} color={theme.colors.text1} />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.timerContainer}>
-        <View style={styles.timerCircle}>
-          
-          <View style={styles.avatarsWrapper}>
-            {[...Array(maxMembers)].map((_, index) => {
-              const member = members[index];
-              return (
-                <View key={index} style={styles.avatarSpot}>
-                  {member ? (
-                    <EmojiAvatar size={50} emoji={member.emoji} bgColor='#E5EDDF' />
-                  ) : (
-                    <TouchableOpacity style={styles.emptySpot} activeOpacity={0.7}>
-                      <Feather name="plus" size={24} color={theme.colors.text2} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-
-        </View>
-        
-        <Animated.View style={[styles.dotRotatorContainer, { transform: [{ rotate: rotateAnimation }] }]}>
-            <View style={styles.progressDot} />
-        </Animated.View>
-      </View>
-
-      <View style={styles.timeWrapper}>
-        <Text style={styles.timeText}>{formatTime(timeLeft)}</Text>
-      </View>
-
-      <TouchableOpacity 
-        style={[styles.feedButton, isActive && { backgroundColor: theme.colors.text2 }]} 
-        activeOpacity={0.8}
-        onPress={handleToggleTimer}
-      >
-        <Text style={styles.feedButtonText}>
-          {isActive ? 'PAUSE' : (isBreak ? 'REST' : 'START FOCUS')}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.membersPanel}>
-          <View style={styles.membersHeader}>
-            <Text style={styles.membersTitle}>Members ({members.length}/{maxMembers})</Text>
-            <TouchableOpacity style={styles.inviteButton}>
-                <Feather name="plus" size={16} color="#FFF" />
-                <Text style={styles.inviteButtonText}>Invite</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <FlatList
-            data={members}
-            keyExtractor={item => item.id}
-            renderItem={renderMember}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.membersList}
+        <TouchableOpacity style={styles.headerIcon} onPress={() => setSoundModalVisible(true)}>
+          <MaterialCommunityIcons 
+            name={selectedSoundId === 'none' ? "music-note-off" : "music-note"} 
+            size={22} 
+            color={theme.colors.primary} 
           />
+        </TouchableOpacity>
       </View>
 
+      <View style={styles.timerSection}>
+        <View ref={timerViewRef} onLayout={measureCenter} style={styles.timerContainer} {...panResponder.panHandlers}>
+          <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
+            <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
+              <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={theme.dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"} strokeWidth={RING_WIDTH * 0.8} fill="none" />
+              <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={theme.colors.primary} strokeWidth={RING_WIDTH} fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" />
+            </G>
+          </Svg>
+          <View style={styles.timerInner} pointerEvents="none">
+            <Text style={styles.timeTextSmall}>{formatTime(timeLeft)}</Text>
+            <Text style={styles.statusText}>{isBreak ? 'RELAX' : 'FOCUS'}</Text>
+          </View>
+          {!isActive && <View style={[styles.sliderHandle, { left: handlePos.x - HANDLE_SIZE / 2, top: handlePos.y - HANDLE_SIZE / 2 }]} />}
+        </View>
+
+        <View style={styles.controlRow}>
+          <TouchableOpacity style={styles.summaryBadge} onPress={() => setSettingsModalVisible(true)}>
+            <Text style={styles.summaryText}>{breakMinutes}m Rest • Round {currentSession}/{totalSessions}</Text>
+            <Feather name="edit-3" size={12} color={theme.colors.text2} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.playButton} onPress={() => setIsActive(!isActive)}>
+             <Ionicons name={isActive ? "pause" : "play"} size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.membersSection}>
+        <View style={styles.membersHeader}>
+          <Text style={styles.membersTitle}>Buddies ({activeUsers.length})</Text>
+          <TouchableOpacity style={styles.chatBtn} onPress={() => setChatModalVisible(true)}>
+            <Feather name="message-circle" size={20} color={theme.colors.text1} />
+          </TouchableOpacity>
+        </View>
+        <FlatList 
+          data={activeUsers} 
+          keyExtractor={item => item.id} 
+          renderItem={({item}) => (
+            <View style={styles.mateCard}>
+              <ProfileAvatar avatar={item.avatar} size={40} bgColor="#F3F4F6" />
+              <View style={styles.mateInfo}>
+                <Text style={styles.mateName}>{item.name} {item.id === currentUserId && '(You)'}</Text>
+                <Text style={styles.mateSub}>{item.status || 'Thinking...'}</Text>
+              </View>
+              <View style={styles.mateTimeBox}>
+                <Text style={styles.mateTimeText}>{formatTime(item.timeLeft || 0)}</Text>
+              </View>
+            </View>
+          )} 
+        />
+      </View>
+
+      <Modal 
+        visible={isSettingsModalVisible} 
+        animationType="slide" 
+        transparent={true}
+        onRequestClose={() => setSettingsModalVisible(false)} 
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSettingsModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Timer Settings</Text>
+
+            <View style={styles.settingRow}>
+              <View>
+                <Text style={styles.label}>Focus Subject</Text>
+                <Text style={styles.subLabel}>What are you working on?</Text>
+              </View>
+              <TextInput 
+                style={styles.textInput} 
+                value={subject} 
+                onChangeText={setSubject}
+                placeholder="e.g. Coding"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            <View style={styles.settingRow}>
+              <View>
+                <Text style={styles.label}>Total Sessions</Text>
+                <Text style={styles.subLabel}>Target: {totalSessions} rounds</Text>
+              </View>
+              <View style={styles.stepper}>
+                <TouchableOpacity 
+                  style={styles.stepBtn} 
+                  onPress={() => setTotalSessions(Math.max(1, totalSessions - 1))}
+                >
+                  <Feather name="minus" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+                <Text style={styles.stepVal}>{totalSessions}</Text>
+                <TouchableOpacity 
+                  style={styles.stepBtn} 
+                  onPress={() => setTotalSessions(totalSessions + 1)}
+                >
+                  <Feather name="plus" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.confirmBtn} 
+              onPress={() => {
+                setSettingsModalVisible(false);
+                syncMyStatus();
+              }}
+            >
+              <Text style={{color: '#FFF', fontWeight: 'bold', fontSize: 16}}>Save Settings</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal 
+        visible={isSoundModalVisible} 
+        animationType="fade" 
+        transparent={true}
+        onRequestClose={() => setSoundModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setSoundModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Ambient Sounds</Text>
+            
+            <View style={styles.soundGrid}>
+              {AMBIENT_SOUNDS.map((s) => (
+                <TouchableOpacity 
+                  key={s.id} 
+                  style={[styles.soundItem, selectedSoundId === s.id && styles.soundItemActive]}
+                  onPress={() => handleSoundSelect(s.id)}
+                >
+                  <MaterialCommunityIcons 
+                    name={s.icon as any} 
+                    size={32} 
+                    color={selectedSoundId === s.id ? '#FFF' : theme.colors.text1} 
+                  />
+                  <Text style={[styles.soundName, selectedSoundId === s.id && {color: '#FFF'}]}>
+                    {s.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.confirmBtn} onPress={() => setSoundModalVisible(false)}>
+              <Text style={{color: '#FFF', fontWeight: 'bold'}}>Done</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
-  )
+  );
 }
 
 const createStyles = (theme: Theme) => StyleSheet.create({
-  container: { 
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 5, height: 60 },
+  backBtn: { padding: 8, backgroundColor: theme.colors.card, borderRadius: 12 },
+  roomHeaderTitle: { fontSize: 18, fontWeight: '800', flex: 1, textAlign: 'center', marginHorizontal: 10, color: theme.colors.text1 },
+  headerIcon: { padding: 8, backgroundColor: theme.colors.card, borderRadius: 12 },
+
+  timerSection: { alignItems: 'center', paddingVertical: 5 },
+  timerContainer: { width: CIRCLE_SIZE, height: CIRCLE_SIZE, justifyContent: 'center', alignItems: 'center' },
+  timerInner: { position: 'absolute', alignItems: 'center' },
+  timeTextSmall: { fontSize: 42, fontWeight: '200', color: theme.colors.text1, fontVariant: ['tabular-nums'] },
+  statusText: { fontSize: 10, fontWeight: '800', color: theme.colors.text2, letterSpacing: 2, marginTop: -5 },
+  sliderHandle: { position: 'absolute', width: HANDLE_SIZE, height: HANDLE_SIZE, borderRadius: HANDLE_SIZE/2, backgroundColor: '#FFF', borderWidth: 4, borderColor: theme.colors.primary, elevation: 5, zIndex: 99 },
+  
+  controlRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, width: '90%', justifyContent: 'space-between' },
+  summaryBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 25, elevation: 2, flex: 1, marginRight: 15 },
+  summaryText: { fontSize: 13, fontWeight: '700', color: theme.colors.text1, marginRight: 10 },
+  playButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 4 },
+
+  membersSection: { flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 20, marginTop: 10, elevation: 15 },
+  membersHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  membersTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.text1 },
+  chatBtn: { padding: 10, backgroundColor: '#F3F4F6', borderRadius: 12 },
+  mateCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: '#F9FAFB', padding: 12, borderRadius: 20 },
+  mateInfo: { flex: 1, marginLeft: 12 },
+  mateName: { fontSize: 14, fontWeight: '700', color: theme.colors.text1 },
+  mateSub: { fontSize: 12, color: theme.colors.text2 },
+  mateTimeBox: { backgroundColor: '#E5EDDF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  mateTimeText: { fontSize: 13, fontWeight: 'bold', color: theme.colors.primary },
+
+  modalOverlay: { 
     flex: 1, 
-    alignItems: 'center', 
-    backgroundColor: theme.colors.background,
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'flex-end'
   },
-  header: { 
-    width: '100%', 
+
+  modalContent: { 
+    backgroundColor: '#F7F9F5',
+    padding: 30, 
+    borderTopLeftRadius: 35, 
+    borderTopRightRadius: 35,
+    minHeight: 400 
+  },
+
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#DDD',
+    borderRadius: 5,
+    alignSelf: 'center',
+    marginBottom: 20
+  },
+
+  modalTitle: { 
+    fontSize: 22, 
+    fontWeight: 'bold', 
+    marginBottom: 25, 
+    textAlign: 'center', 
+    color: theme.colors.text1 
+  },
+
+  settingRow: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    paddingHorizontal: 25, 
-    marginTop: 15, 
-    marginBottom: 20,
-  },
-  backButton: {
-    padding: 10,
-    backgroundColor: theme.colors.card,
-    borderRadius: 20,
-  },
-  titleContainer: { 
-    alignItems: 'center', 
-  },
-  headerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  roomIconText: {
-    fontSize: 22,
-    marginRight: 8,
-  },
-  roomTitleText: { 
-    fontSize: 20, 
-    fontWeight: '800', 
-    color: theme.colors.text1, 
-  },
-  subjectPill: {
-    backgroundColor: '#E5EDDF', 
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  subjectPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  iconButton: { 
-    padding: 10,
-  },
-  timerContainer: { 
-    position: 'relative', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
     marginBottom: 20, 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 20 
   },
-  timerCircle: { 
-    width: 260, 
-    height: 260, 
-    borderRadius: 130, 
-    borderWidth: 6, 
-    borderColor: '#E5E7EB', 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    overflow: 'visible', 
+
+  soundGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    marginBottom: 10 
   },
-  avatarsWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 220, 
-    height: 220,
-  },
-  avatarSpot: {
-    width: 70, 
-    height: 70,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 10,
-  },
-  emptySpot: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: theme.colors.text2,
-    borderStyle: 'dashed', 
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-  },
-  dotRotatorContainer: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    justifyContent: 'flex-start',
+
+  soundItem: { 
+    width: '48%', 
+    backgroundColor: '#FFF', 
+    padding: 20, 
+    borderRadius: 20, 
     alignItems: 'center', 
+    marginBottom: 15, 
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2
   },
-  progressDot: { 
-    width: 22, 
-    height: 22, 
-    borderRadius: 11, 
+
+  soundItemActive: { 
+    backgroundColor: theme.colors.primary 
+  },
+
+  soundName: { 
+    marginTop: 10, 
+    fontWeight: '600', 
+    color: theme.colors.text1 
+  },
+
+  confirmBtn: { 
     backgroundColor: theme.colors.primary, 
-    borderWidth: 4, 
-    borderColor: theme.colors.background, 
-    marginTop: -11, 
-  },
-  timeWrapper: { 
-    marginBottom: 15,
-  },
-  timeText: { 
-    fontSize: 48, 
-    fontWeight: '800', 
-    color: theme.colors.text1, 
-    fontVariant: ['tabular-nums'],
-  },
-  feedButton: { 
-    backgroundColor: theme.colors.primary, 
-    width: 180, 
-    paddingVertical: 15, 
+    padding: 18, 
     borderRadius: 25, 
     alignItems: 'center', 
-    marginBottom: 25,
-    shadowColor: theme.colors.primary, 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.2, 
-    shadowRadius: 8, 
-    elevation: 4,
+    marginTop: 10 
   },
-  feedButtonText: { 
+
+  stepVal: { 
     fontSize: 16, 
-    color: '#FFF', 
     fontWeight: '800', 
-    letterSpacing: 2,
+    width: 55, 
+    textAlign: 'center' 
   },
-  membersPanel: {
-      flex: 1, 
-      width: '100%',
-      backgroundColor: '#FFFFFF', 
-      borderTopLeftRadius: 35, 
-      borderTopRightRadius: 35,
-      paddingHorizontal: 25,
-      paddingTop: 20,
-      shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 10, 
+
+  label: { fontSize: 16, fontWeight: '700', color: theme.colors.text1 },
+  subLabel: { fontSize: 12, color: '#999' },
+
+  textInput: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 12,
+    width: 120,
+    textAlign: 'right',
+    color: theme.colors.text1,
+    fontWeight: '600'
   },
-  membersHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 15,
-  },
-  membersTitle: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: theme.colors.text1,
-  },
-  inviteButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme.colors.primary,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 15,
-  },
-  inviteButtonText: {
-      color: '#FFF',
-      fontWeight: 'bold',
-      marginLeft: 4,
-      fontSize: 13,
-  },
-  membersList: {
-      paddingBottom: 20, 
-  },
-  memberCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6', 
-  },
-  memberInfo: {
-      flex: 1,
-      marginHorizontal: 15,
-  },
-  memberNameRow: {
-    flexDirection: 'row',
+  stepper: { 
+    flexDirection: 'row', 
     alignItems: 'center',
-    marginBottom: 2,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 15,
+    padding: 5
   },
-  memberName: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: theme.colors.text1,
+  stepBtn: { 
+    width: 35, 
+    height: 35, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    elevation: 1
   },
-  hostBadge: {
-    backgroundColor: '#E5EDDF',
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.primary,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    marginLeft: 6,
-  },
-  memberStatus: {
-      fontSize: 12,
-      fontWeight: '600',
-  }
 });
