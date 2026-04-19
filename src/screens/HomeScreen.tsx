@@ -99,6 +99,9 @@ export default function HomeScreen() {
   const timerViewRef = useRef<View>(null);
   const circleCenterRef = useRef({ x: 0, y: 0 });
 
+  const [totalFocusSeconds, setTotalFocusSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0); 
+
   const getTodayStr = () => new Date().toISOString().split('T')[0];
   const getYesterdayStr = () => {
     const d = new Date();
@@ -110,16 +113,34 @@ export default function HomeScreen() {
     if (!USER_ID) return;
     const today = getTodayStr();
     const yesterday = getYesterdayStr();
-    if (lastFocusDate === today) return;
 
     try {
       const userRef = doc(db, 'users', USER_ID);
-      let newStreak = streak;
-      if (lastFocusDate === yesterday) { newStreak += 1; } 
-      else { newStreak = 1; }
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        let currentCoins = data.coins || 0;
+        let newStreak = streak;
+        const earnedCoins = Math.floor(elapsedSeconds / 60); 
+        const totalNewCoins = currentCoins + earnedCoins;
 
-      await updateDoc(userRef, { streak: newStreak, lastFocusDate: today });
-    } catch (e) { console.log(e); }
+        // --- 2. Streak 邏輯 ---
+        if (lastFocusDate !== today) {
+          if (lastFocusDate === yesterday) { newStreak += 1; } 
+          else { newStreak = 1; }
+        }
+
+        // --- 3. 更新到 Firebase ---
+        await updateDoc(userRef, { 
+          streak: newStreak, 
+          lastFocusDate: today,
+          coins: totalNewCoins // 🌟 存入新金幣總數
+        });
+
+        Alert.alert("Mission Complete!", `You earned 🐟 ${earnedCoins} coins!`);
+      }
+    } catch (e) { console.log("Coin update error:", e); }
   };
 
   const syncToFirebase = async () => {
@@ -135,18 +156,20 @@ export default function HomeScreen() {
   };
 
   const getCurrentPetImage = () => {
-    const petData = PETS_DATA[selectedPetId as keyof typeof PETS_DATA] || PETS_DATA.elephant;
-    if (showCryingPet) return petData.stages.crying;
-    if (isBreak) return petData.stages.child;
-    if (!isActive && timeLeft === focusMinutes * 60) return petData.stages.baby;
+      const petData = PETS_DATA[selectedPetId as keyof typeof PETS_DATA] || PETS_DATA.elephant;
+      if (showCryingPet) return petData.stages.crying;
+      const totalTaskSeconds = (focusMinutes * 60 * totalRounds) + (breakMinutes * 60 * (totalRounds - 1));
 
-    const totalSeconds = focusMinutes * 60;
-    const percentageLeft = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 100;
+      const progressPercent = (elapsedSeconds / totalTaskSeconds) * 100;
 
-    if (percentageLeft > 70) return petData.stages.baby; 
-    if (percentageLeft <= 20) return petData.stages.adult; 
-    return petData.stages.child;
-  };
+      if (progressPercent >= 90) {
+        return petData.stages.adult;
+      } else if (progressPercent >= 30) {
+        return petData.stages.child;
+      } else {
+        return petData.stages.baby;
+      }
+    };
 
   useEffect(() => {
     if (!USER_ID) return;
@@ -185,24 +208,37 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let iv: any = null;
+    
     if (isActive && timeLeft > 0) {
-      iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
+      iv = setInterval(() => {
+        setTimeLeft(t => t - 1);
+          if (!isBreak) { 
+            setElapsedSeconds(prev => prev + 1);
+          }
+        
+      },1000);
     } else if (isActive && timeLeft === 0) {
       if (!isBreak) {
         if (currentRound < totalRounds) {
-          setIsBreak(true); setTimeLeft(breakMinutes * 60);
-          Alert.alert("Break Time!");
+          setIsBreak(true); 
+          setTimeLeft(breakMinutes * 60);
         } else {
-          setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
+          setIsActive(false); 
+          setCurrentRound(1); 
+          setTimeLeft(focusMinutes * 60);
           handleUpdateStreak(); 
-          Alert.alert("Mission Complete!");
+          setElapsedSeconds(0);
+          Alert.alert("Mission Complete!", "You finished all sessions!");
         }
       } else {
-        setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
+        setCurrentRound(r => r + 1); 
+        setIsBreak(false); 
+        setTimeLeft(focusMinutes * 60);
       }
     }
+    
     return () => clearInterval(iv);
-  }, [isActive, timeLeft, isBreak, currentRound, totalRounds]);
+  }, [isActive, timeLeft, isBreak, currentRound, totalRounds, breakMinutes, focusMinutes]);
 
   useEffect(() => { syncToFirebase(); }, [currentMode, isActive, isBreak, selectedPetId]);
 
@@ -218,6 +254,7 @@ export default function HomeScreen() {
         { text: "Abandon", style: "destructive", onPress: () => {
           setIsActive(false);
           setTimeLeft(focusMinutes * 60);
+          setElapsedSeconds(0);
           setShowCryingPet(true);
           setTimeout(() => setShowCryingPet(false), 4000);
         }}
@@ -286,7 +323,7 @@ export default function HomeScreen() {
           source={item.stages.adult} 
           style={[
             styles.petOptionImage,
-            !isUnlocked && { tintColor: '#666' } // 沒解鎖圖片變灰
+            !isUnlocked && { tintColor: '#666' }
           ]} 
           resizeMode="contain" 
         />
@@ -349,9 +386,22 @@ export default function HomeScreen() {
 
       <View style={styles.infoCard}>
         <Text style={styles.timeText}>{Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
-        <TouchableOpacity style={styles.summaryBadge} onPress={() => setModalVisible(true)}>
+        <TouchableOpacity 
+          style={[
+            styles.summaryBadge, 
+            isActive && { opacity: 0.5 } 
+          ]} 
+          onPress={() => setModalVisible(true)}
+          disabled={isActive} 
+        >
           <Feather name="clock" size={14} color={theme.colors.primary} />
-          <Text style={styles.summaryText}>{breakMinutes}m Rest • Round {currentRound}/{totalRounds}</Text>
+          <Text style={styles.summaryText}>
+            {breakMinutes}m Rest • Round {currentRound}/{totalRounds}
+          </Text>
+          
+          {!isActive && (
+            <Feather name="edit-3" size={12} color={theme.colors.text2} style={{marginLeft: 4}} />
+          )}
         </TouchableOpacity>
       </View>
 
