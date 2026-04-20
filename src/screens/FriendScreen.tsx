@@ -83,10 +83,18 @@ export default function FriendScreen() {
           onPress: async() => {
             try {
               const myRef = doc(db, 'users', currentUserId as string);
+              const friendRef = doc(db, 'users', friendId);
               await updateDoc(myRef, {
                 friendIds: arrayRemove(friendId)
               });
+
+              await updateDoc(friendRef,{
+                friendsIds: arrayRemove(currentUserId)
+              });
+
+              Alert.alert("Success", "Friend removed successfully.");
             }catch (error) {
+              console.error("Delete error:", error);
               Alert.alert("error", "delete failed, please try again later");
             }   
           }
@@ -181,7 +189,7 @@ export default function FriendScreen() {
           
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity style={styles.notificationIcon} onPress={() => setRequestModalVisible(true)}>
-            <MaterialIcons name="notifications-none" size={28} color={theme.colors.text1} />
+            <Feather name="bell" size={24} color={theme.colors.text1} />
             {pendingRequests.length > 0 && (
               <View style={styles.redDot}>
                 <Text style={styles.redDotText}>{pendingRequests.length}</Text>
@@ -292,22 +300,24 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.text1,
   },
 
+  
   notificationIcon: {
-    marginRight: 15, 
-    position: 'relative' 
+    marginRight: 18, 
+    position: 'relative',
+    padding: 5,
   },
   redDot: { 
-    position: 'absolute', 
-    top: -5, 
-    right: -5, 
+    position: 'absolute',
+    top: 0,
+    right: 0,
     backgroundColor: '#EF4444', 
-    width: 18, 
-    height: 18, 
-    borderRadius: 9, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderWidth: 1.5, 
-    borderColor: '#FFF' 
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.background, 
   },
   redDotText: { 
     color: '#FFF', 

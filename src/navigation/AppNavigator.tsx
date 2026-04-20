@@ -1,4 +1,4 @@
-import { Alert, StyleSheet, ActivityIndicator, View } from 'react-native'
+import { Alert, StyleSheet, ActivityIndicator, View, Platform} from 'react-native'
 import { useEffect, useRef } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -20,16 +20,25 @@ import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import SettingScreen from '../screens/SettingScreen';
 import { configureNotificationChannelAsync, ensureNotificationPermissionsAsync } from '../utils/Notifications';
+import { useTheme } from '../utils/ThemeContext'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
 function Tabs() {
+  const { theme } = useTheme()
   return (
     <Tab.Navigator 
     screenOptions={({ route }) => ({
       headerShown: false,
       tabBarShowLabel: false,
+      tabBarStyle: {
+        backgroundColor: theme.colors.background,
+        borderTopWidth: 2,
+        borderTopColor: theme.colors.secondary1,
+        height: Platform.OS === 'ios' ? 90 : 70,
+        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+      },
       tabBarIcon: ({ focused, color }) => {
         switch (route.name) {
           case 'Home':
@@ -56,6 +65,7 @@ function Tabs() {
 
 export default function AppNavigator() {
   const { user, loading } = useAuth()
+  const { theme } = useTheme()
   const promptedUserRef = useRef<string | null>(null)
   
   useEffect(() => {
@@ -126,14 +136,19 @@ export default function AppNavigator() {
 }
 
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={{
+      headerStyle: {
+        backgroundColor: theme.colors.background, 
+      },
+      headerShadowVisible: false,
+    }}>
       {user ? (
         <>
           <Stack.Screen name='Tabs' component={Tabs} options={{ headerShown: false }}/>
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
           <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{headerTitle: ''}}/>
-          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{headerTitle: ''}}/>
-          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{headerTitle: ''}}/>
+          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{title: 'Learning Analytics'}}/>
+          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{title: 'Settings'}}/>
           <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{headerTitle: ''}}/>
         </>
       ) : (

@@ -13,7 +13,7 @@ interface MenuLinkProps {
     menuItemSubtitle: any;
   };
   iconBg: string;
-  screen?: string;          
+  screen?: string;    
 }
 
 export default function MenuLink({ icon, title, subtitle, styles, iconBg, screen }: MenuLinkProps) {

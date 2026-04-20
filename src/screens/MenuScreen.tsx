@@ -218,6 +218,7 @@ export default function MenuScreen() {
                         styles={styles} 
                         iconBg="#A8C2A0"
                         screen='StatisticsScreen'
+
                     />
                     <MenuLink 
                         icon="settings-outline" 

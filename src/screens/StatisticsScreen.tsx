@@ -242,135 +242,132 @@ export default function StatisticsScreen() {
 
 
   return ( 
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.headerTitle}>Learning Analytics</Text>
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 20 }}>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Deadline Progress</Text>
-          {deadlineProgress.map((item, index) => (
-            <View key={index} style={styles.progressCard}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center"
-                }}
-              >
-                <Text style={{ fontWeight: "bold" }}>
-                  {item.title}
-                </Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Deadline Progress</Text>
+        {deadlineProgress.map((item, index) => (
+          <View key={index} style={styles.progressCard}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <Text style={{ fontWeight: "bold" }}>
+                {item.title}
+              </Text>
 
-                <Text style={{ fontWeight: "bold", color: getColor(item.progress) }}>
-                  {Math.round(item.progress * 100)}%
-                </Text>
-              </View>
-              <ProgressBar progress={item.progress} />
+              <Text style={{ fontWeight: "bold", color: getColor(item.progress) }}>
+                {Math.round(item.progress * 100)}%
+              </Text>
             </View>
-          ))}
-        </View>
+            <ProgressBar progress={item.progress} />
+          </View>
+        ))}
+      </View>
 
-        <StatCard title='Session load (5 current days)'>
-          {barData ? (
-            <BarChart
-              data={barData}
+      <StatCard title='Session load (5 current days)'>
+        {barData ? (
+          <BarChart
+            data={barData}
+            width={screenWidth - 60}
+            height={220}
+            segments={segments}
+            yAxisLabel=''
+            yAxisSuffix=''
+            fromZero={true}
+            showValuesOnTopOfBars={true}
+            chartConfig={{
+              backgroundGradientFrom: theme.colors.background,
+              backgroundGradientTo: theme.colors.background,
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(53, 79, 82, ${opacity})`,
+              labelColor: (opacity = 1) => theme.colors.text1,
+              barPercentage: 0.6,
+            }}
+            style={{ marginVertical: 8, borderRadius: 16, marginRight: 40 }}
+          />
+        ) : (
+          <Text style={styles.noData}>No sessions found in schedule.</Text>
+        )}
+      </StatCard>
+
+      <StatCard title='Study minutes (Past 7 days)'>
+        {lineData.data.length > 0 ? (
+          <View>
+            <LineChart
+              data={{
+                labels: lineData.labels,
+                datasets: [{ data: lineData.data }] 
+              }}
               width={screenWidth - 60}
               height={220}
-              segments={segments}
-              yAxisLabel=''
-              yAxisSuffix=''
-              fromZero={true}
-              showValuesOnTopOfBars={true}
-              chartConfig={{
-                backgroundGradientFrom: theme.colors.background,
-                backgroundGradientTo: theme.colors.background,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(53, 79, 82, ${opacity})`,
-                labelColor: (opacity = 1) => theme.colors.text1,
-                barPercentage: 0.6,
-              }}
-              style={{ marginVertical: 8, borderRadius: 16, marginRight: 40 }}
-            />
-          ) : (
-            <Text style={styles.noData}>No sessions found in schedule.</Text>
-          )}
-        </StatCard>
-
-        <StatCard title='Study minutes (Past 7 days)'>
-          {lineData.data.length > 0 ? (
-            <View>
-              <LineChart
-                data={{
-                  labels: lineData.labels,
-                  datasets: [{ data: lineData.data }] 
-                }}
-                width={screenWidth - 60}
-                height={220}
-                chartConfig={lineChartConfig}
-                verticalLabelRotation={-30}
-                bezier
-                style={styles.lineChartStyle}
-                onDataPointClick={(data) => {
-                  setTooltip({ visible: true, value: data.value, x: data.x, y: data.y });
-                }}
-              />                  
-              {tooltip.visible && (
-                <View style={[styles.tooltip, { top: tooltip.y - 40, left: tooltip.x - 5 }]}>
-                  <Text style={styles.tooltipText}>{tooltip.value}m</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <Text style={styles.noData}>No activity recorded yet.</Text>
-          )}
-        </StatCard>
-
-        <StatCard title="Completion Overview">
-          {pieData.completed + pieData.skipped > 0 ? (
-            <PieChart
-              data={[
-                {
-                  name: 'Done',
-                  population: pieData.completed,
-                  color: theme.colors.primary,
-                  legendFontColor: theme.colors.text1,
-                  legendFontSize: 12,
-                },
-                {
-                  name: 'Skipped',
-                  population: pieData.skipped,
-                  color: '#E67E22',
-                  legendFontColor: theme.colors.text1,
-                  legendFontSize: 12,
-                },
-                {
-                  name: 'Up comming',
-                  population: pieData.upComming,
-                  color: '#936944',
-                  legendFontColor: theme.colors.text1,
-                  legendFontSize: 12,
-                },
-              ]}
-              width={screenWidth - 60}
-              height={180}
-              accessor="population"
-              backgroundColor="transparent"
-              paddingLeft="5"
               chartConfig={lineChartConfig}
-            />
-          ) : (
-            <Text style={styles.noData}>Complete a session to see stats!</Text>
-          )}
-        </StatCard>
-
-        {tooltip.visible && (
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => setTooltip({ ...tooltip, visible: false })}
-          />
+              verticalLabelRotation={-30}
+              bezier
+              style={styles.lineChartStyle}
+              onDataPointClick={(data) => {
+                setTooltip({ visible: true, value: data.value, x: data.x, y: data.y });
+              }}
+            />                  
+            {tooltip.visible && (
+              <View style={[styles.tooltip, { top: tooltip.y - 40, left: tooltip.x - 5 }]}>
+                <Text style={styles.tooltipText}>{tooltip.value}m</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text style={styles.noData}>No activity recorded yet.</Text>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </StatCard>
+
+      <StatCard title="Completion Overview">
+        {pieData.completed + pieData.skipped > 0 ? (
+          <PieChart
+            data={[
+              {
+                name: 'Done',
+                population: pieData.completed,
+                color: theme.colors.primary,
+                legendFontColor: theme.colors.text1,
+                legendFontSize: 12,
+              },
+              {
+                name: 'Skipped',
+                population: pieData.skipped,
+                color: '#E67E22',
+                legendFontColor: theme.colors.text1,
+                legendFontSize: 12,
+              },
+              {
+                name: 'Up comming',
+                population: pieData.upComming,
+                color: '#936944',
+                legendFontColor: theme.colors.text1,
+                legendFontSize: 12,
+              },
+            ]}
+            width={screenWidth - 60}
+            height={180}
+            accessor="population"
+            backgroundColor="transparent"
+            paddingLeft="5"
+            chartConfig={lineChartConfig}
+          />
+        ) : (
+          <Text style={styles.noData}>Complete a session to see stats!</Text>
+        )}
+      </StatCard>
+
+      {tooltip.visible && (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={() => setTooltip({ ...tooltip, visible: false })}
+        />
+      )}
+    </ScrollView>
   )
 }
 
@@ -378,9 +375,6 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    padding: 20,
   },
   headerTitle: {
     fontSize: 24,
