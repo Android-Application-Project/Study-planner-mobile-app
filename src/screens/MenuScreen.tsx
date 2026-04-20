@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, TextInput, Image } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, TextInput, Image, Switch } from 'react-native'
 import { useMemo, useState, useEffect } from 'react'
 import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
@@ -10,8 +10,11 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MenuLink from '../components/MenuLink'
 import { useSessions } from 'src/utils/FetchSessions'
+import { useNavigation, NavigationProp } from '@react-navigation/native'
+import { usePreferences } from 'src/utils/SettingsContext'
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 
@@ -21,23 +24,10 @@ type UserData = {
   coins: number
 }
 
-type SmartScheduleSessions = {
-  completed: boolean
-  date: string
-  day: string
-  end: string
-  focusType: string
-  icons: string
-  minutes: number
-  notificationId: string
-  room: string
-  skipped: boolean
-  title: string
-}
-
 export default function MenuScreen() {
     const { theme } = useTheme()
     const styles = useMemo(() => createStyles(theme), [theme])
+    const navigation = useNavigation<NavigationProp<any>>();
 
     const { sessions } = useSessions()
 
@@ -47,6 +37,23 @@ export default function MenuScreen() {
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
     const [avatarPopupVisible, setAvatarPopupVisible] = useState(false)
+
+    const { 
+        vibrationEnabled, setVibrationEnabled,
+        notificationsEnabled, setNotificationsEnabled,
+        libraryAccessEnabled, setLibraryAccessEnabled,
+        checkSystemNotifications
+    } = usePreferences()
+
+    const handleNotificationChange = async (value: boolean) => {
+        if (value) {
+            const isSystemAllowed = await checkSystemNotifications();
+            if (!isSystemAllowed) {
+                return; 
+            }
+        }
+        setNotificationsEnabled(value);
+    }
     
     const[newName, setNewName] = useState('')   
 
@@ -209,17 +216,65 @@ export default function MenuScreen() {
                     </View>
                 </View>
 
+                <View style={{ marginTop: 10 }}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>PREFERENCES</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <MaterialIcons name="vibration" size={24} color="#556B52" />
+                                <Text style={styles.settingText}>Vibration</Text>
+                            </View>
+                            <Switch 
+                                value={vibrationEnabled} 
+                                onValueChange={setVibrationEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="notifications-outline" size={22} color="#556B52" />
+                                <Text style={styles.settingText}>Notifications</Text>
+                            </View>
+                            <Switch 
+                                value={notificationsEnabled} 
+                                onValueChange={handleNotificationChange}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Feather name="folder" size={22} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Library Access</Text>
+                            </View>
+                            <Switch 
+                                value={libraryAccessEnabled} 
+                                onValueChange={setLibraryAccessEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                <TouchableOpacity style={{ marginTop: 10 }} onPress={() => navigation.navigate('StatisticsScreen')}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>STATISTICS</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="bar-chart-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Analytics</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
 
                 <View style={styles.menuList}>
-                    <MenuLink 
-                        icon="bar-chart-outline" 
-                        title="Statistics" 
-                        subtitle="View your study analytics" 
-                        styles={styles} 
-                        iconBg="#A8C2A0"
-                        screen='StatisticsScreen'
-
-                    />
                     <MenuLink 
                         icon="settings-outline" 
                         title="Settings" 
@@ -468,5 +523,32 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     uploadOption: { marginTop: 10, flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#F0F7FF', borderRadius: 12, width: '100%', justifyContent: 'center', marginBottom: 10 },
     uploadOptionText: { marginLeft: 10, color: '#007AFF', fontWeight: 'bold' },
     avatarImage: { width: 70, height: 70, borderRadius: 35 },
-
+    settingsGroup: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        paddingHorizontal: 15,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+    },
+    settingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    settingLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    settingText: {
+        fontSize: 16,
+        color: '#2D3A29',
+        fontWeight: '500',
+    },
 })

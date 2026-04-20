@@ -4,8 +4,8 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/utils/AuthContext'
 import ThemeProvider from './src/utils/ThemeContext';
 import { useTheme } from './src/utils/ThemeContext';
-import './src/utils/Notifications';
 import { FetchSessions } from 'src/utils/FetchSessions';
+import { PreferencesProvider } from 'src/utils/SettingsContext';
 
 function MainApp() {
   const { theme } = useTheme()
@@ -21,13 +21,11 @@ function MainApp() {
   };
   
   return (
-    <AuthProvider>
-      <FetchSessions>
-        <NavigationContainer theme={navTheme}>
-          <AppNavigator/>
-        </NavigationContainer>
-      </FetchSessions>
-    </AuthProvider>
+    <FetchSessions>
+      <NavigationContainer theme={navTheme}>
+        <AppNavigator/>
+      </NavigationContainer>
+    </FetchSessions>
   );
 }
 
@@ -35,7 +33,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <MainApp />
+        <PreferencesProvider>
+          <AuthProvider>
+            <MainApp />
+          </AuthProvider>
+        </PreferencesProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   )

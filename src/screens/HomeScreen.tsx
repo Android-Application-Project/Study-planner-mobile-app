@@ -1,5 +1,5 @@
 import {
-  StyleSheet, Text, View, TouchableOpacity, Modal, Pressable, ScrollView, PanResponder, Alert, FlatList, Dimensions, Image 
+  StyleSheet, Text, View, TouchableOpacity, Modal, Pressable, Vibration, PanResponder, Alert, FlatList, Dimensions, Image 
 } from 'react-native'
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -11,6 +11,7 @@ import { doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
 import { useTheme } from 'src/utils/ThemeContext'
 import { Theme } from '../utils/Themes'
+import { usePreferences } from 'src/utils/SettingsContext'
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +69,8 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const USER_ID = auth.currentUser?.uid;
+
+  const { vibrationEnabled } = usePreferences()
 
   const [streak, setStreak] = useState(0);
   const [lastFocusDate, setLastFocusDate] = useState<string | null>(null);
@@ -188,18 +191,26 @@ export default function HomeScreen() {
     if (isActive && timeLeft > 0) {
       iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
     } else if (isActive && timeLeft === 0) {
-      if (!isBreak) {
-        if (currentRound < totalRounds) {
-          setIsBreak(true); setTimeLeft(breakMinutes * 60);
-          Alert.alert("Break Time!");
-        } else {
-          setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
-          handleUpdateStreak(); 
-          Alert.alert("Mission Complete!");
-        }
-      } else {
-        setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
+
+      if (vibrationEnabled) {
+        const VIBRATION_PATTERN = [0, 500, 200, 500];
+        Vibration.vibrate(VIBRATION_PATTERN);
       }
+
+      setTimeout(() => {
+        if (!isBreak) {
+          if (currentRound < totalRounds) {
+            setIsBreak(true); setTimeLeft(breakMinutes * 60);
+            Alert.alert("Break Time!");
+          } else {
+            setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
+            handleUpdateStreak(); 
+            Alert.alert("Mission Complete!");
+          }
+        } else {
+          setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
+        }
+      }, 100)
     }
     return () => clearInterval(iv);
   }, [isActive, timeLeft, isBreak, currentRound, totalRounds]);
@@ -247,8 +258,11 @@ export default function HomeScreen() {
       let angle = Math.atan2(pageX - cx, -(pageY - cy)) * (180 / Math.PI);
       if (angle < 0) angle += 360;
       let snapped = Math.round(((angle / 360) * MAX_MINUTES) / STEP_MINUTES) * STEP_MINUTES;
-      setFocusMinutes(snapped);
-      if (!isBreak) setTimeLeft(snapped * 60);
+      if (snapped !== focusMinutes) {
+        Vibration.vibrate(10);
+        setFocusMinutes(snapped);
+        if (!isBreak) setTimeLeft(snapped * 60);
+      }
     }
   }), [isActive, isBreak]);
 
