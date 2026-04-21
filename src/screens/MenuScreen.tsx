@@ -11,10 +11,9 @@ import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import MenuLink from '../components/MenuLink'
 import { useSessions } from 'src/utils/FetchSessions'
 import { useNavigation, NavigationProp } from '@react-navigation/native'
-import { usePreferences } from 'src/utils/SettingsContext'
+import { usePreferences } from 'src/utils/PreferencesContext'
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 
@@ -31,17 +30,20 @@ export default function MenuScreen() {
 
     const { sessions } = useSessions()
 
-    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...' })
+    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...', completedMinutes: 0 })
     const [avatarLoading, setAvatarLoading] = useState(false)
     const [usernameLoading, setUsernameLoading] = useState(false)
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
     const [avatarPopupVisible, setAvatarPopupVisible] = useState(false)
 
+    const[newName, setNewName] = useState('') 
+
     const { 
         vibrationEnabled, setVibrationEnabled,
         notificationsEnabled, setNotificationsEnabled,
         libraryAccessEnabled, setLibraryAccessEnabled,
+        strictModeEnabled, setStrictModeEnabled,
         checkSystemNotifications
     } = usePreferences()
 
@@ -49,13 +51,11 @@ export default function MenuScreen() {
         if (value) {
             const isSystemAllowed = await checkSystemNotifications();
             if (!isSystemAllowed) {
-                return; 
+                return
             }
         }
         setNotificationsEnabled(value);
-    }
-    
-    const[newName, setNewName] = useState('')   
+    }  
 
     useEffect(() => {
         const user = auth.currentUser
@@ -66,7 +66,7 @@ export default function MenuScreen() {
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData
-                setUserData(data)
+                setUserData(prev => ({ ...prev, ...data }))
                 setNewName(data.username)
             }
         })
@@ -74,7 +74,7 @@ export default function MenuScreen() {
     }, [])
 
     const pickImage = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync()
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
         if (status !== 'granted') {
             Alert.alert('Permission Denied', 'We need camera roll permissions to upload a photo.')
             return
@@ -149,11 +149,11 @@ export default function MenuScreen() {
 
     const handleUpdate = async (field: 'username' | 'avatar', value: string) => {
         if (!value.trim()) return Alert.alert('Error', 'Field cannot be empty')
-        setAvatarLoading(true)
-        setUsernameLoading(true)
+        if (field === 'avatar') setAvatarLoading(true)
+        if (field === 'username') setUsernameLoading(true)
         try {
             const user = auth.currentUser
-            if (!user) throw new Error('No user is logged in')
+            if (!user) return
             const docRef = doc(db, 'users', user.uid)
 
             await setDoc(docRef, {
@@ -171,13 +171,44 @@ export default function MenuScreen() {
         }
     }
 
+    const streak = useMemo(() => {
+    if (!sessions || sessions.length === 0) return 0;
+
+    const completedDates = new Set<string>();
+
+    sessions.forEach(s => {
+        if (s.completed) {
+        completedDates.add(s.date);
+        }
+    });
+
+    let count = 0;
+    const current = new Date();
+
+    const todayStr = current.toISOString().split("T")[0];
+    if (!completedDates.has(todayStr)) {
+        current.setDate(current.getDate() - 1);
+    }
+
+    while (true) {
+        const dateStr = current.toISOString().split("T")[0];
+
+        if (completedDates.has(dateStr)) {
+        count++;
+        current.setDate(current.getDate() - 1);
+        } else {
+        break;
+        }
+    }
+
+    return count;
+    }, [sessions]);
+
     const completedRatio = sessions.length > 0
         ? Math.round((sessions.filter( session => session.completed).length / sessions.length) * 100)
         : 0
 
-    const completedMinutes = sessions
-        .filter(session => session.completed)
-        .reduce(( sum, session ) => sum + session.minutes, 0)
+    const completedMinutes = userData.completedMinutes || 0
 
     const completedHours = (completedMinutes / 60).toFixed(1)
 
@@ -203,8 +234,8 @@ export default function MenuScreen() {
 
                 <View style={styles.statsRow}>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>12</Text>
-                        <Text style={styles.statLabel}>This Week</Text>
+                        <Text style={styles.statValue}>{streak}</Text>
+                        <Text style={styles.statLabel}>Streak</Text>
                     </View>
                     <View style={styles.statBox}>
                         <Text style={styles.statValue}>{completedRatio}%</Text>
@@ -246,6 +277,18 @@ export default function MenuScreen() {
 
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
+                                <Ionicons name="lock-closed-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Strict Mode</Text>
+                            </View>
+                            <Switch 
+                                value={strictModeEnabled} 
+                                onValueChange={setStrictModeEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
                                 <Feather name="folder" size={22} color={theme.colors.primary} />
                                 <Text style={styles.settingText}>Library Access</Text>
                             </View>
@@ -258,39 +301,45 @@ export default function MenuScreen() {
                     </View>
                 </View>
 
-                <TouchableOpacity style={{ marginTop: 10 }} onPress={() => navigation.navigate('StatisticsScreen')}>
+                <View style={{ marginTop: 10 }}>
                     <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>STATISTICS</Text>
                     
                     <View style={styles.settingsGroup}>
-                        <View style={styles.settingItem}>
+                        <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('StatisticsScreen')}>
                             <View style={styles.settingLeft}>
                                 <Ionicons name="bar-chart-outline" size={24} color={theme.colors.primary} />
                                 <Text style={styles.settingText}>Analytics</Text>
                             </View>
                             
                             <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('LeaderBoardScreen')}>
+                            <View style={styles.settingLeft}>
+                                <MaterialIcons name="leaderboard" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Leader Board</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+
+                <TouchableOpacity style={{ marginTop: 10 }} onPress={() => navigation.navigate('LegalScreen')}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>PRIVACY POLICY</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>  
+                                <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Privacy Policy Document</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
                         </View>
                     </View>
                 </TouchableOpacity>
-
-
-                <View style={styles.menuList}>
-                    <MenuLink 
-                        icon="settings-outline" 
-                        title="Settings" 
-                        subtitle="App preferences & notifications" 
-                        styles={styles} 
-                        iconBg="#A8C2A0"
-                        screen='SettingScreen'
-                    />
-                    <MenuLink 
-                        icon="document-text-outline" 
-                        title="Terms & Privacy" 
-                        subtitle="Legal information & GDPR" 
-                        styles={styles} 
-                        iconBg="#DEE6D3"
-                    />
-                </View>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(auth)}>
                     <Ionicons name="exit-outline" size={20} color="#6B8E7D" style={{marginRight: 8}} />

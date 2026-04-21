@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { 
   View, 
   Text, 
@@ -25,28 +25,39 @@ export default function AppSegmentedControl({
   onChange,
   style,
 }: SegmentedControlProps) {
-  const translateX = useRef(new Animated.Value(0)).current
+
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const segmentWidth = containerWidth ? (containerWidth - 4) / values.length : 0;
 
   useEffect(() => {
-    Animated.spring(translateX, {
-      toValue: selectedIndex * SEGMENT_WIDTH,
-      useNativeDriver: true,
-      bounciness: 7, 
-      speed: 5,    
-    }).start()
-  }, [selectedIndex])
+    if (segmentWidth > 0) {
+      Animated.spring(translateX, {
+        toValue: selectedIndex * segmentWidth,
+        useNativeDriver: true,
+        bounciness: 7,
+        speed: 5,
+      }).start();
+    }
+  }, [selectedIndex, segmentWidth]);
 
   return (
-    <View style={[styles.container, style]}>
-      <Animated.View 
-        style={[
-          styles.indicator, 
-          { 
-            width: SEGMENT_WIDTH,
-            transform: [{ translateX }] 
-          }
-        ]} 
-      />
+    <View 
+      style={[styles.container, style]}
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+    >
+      {segmentWidth > 0 && (
+        <Animated.View 
+          style={[
+            styles.indicator, 
+            { 
+              width: segmentWidth,
+              transform: [{ translateX }] 
+            }
+          ]} 
+        />
+      )}
       
       {values.map((label, index) => (
         <TouchableOpacity
@@ -55,18 +66,13 @@ export default function AppSegmentedControl({
           onPress={() => onChange(index)}
           style={styles.segment}
         >
-          <Text 
-            style={[
-              styles.text, 
-              selectedIndex === index ? styles.activeText : styles.inactiveText
-            ]}
-          >
+          <Text style={[styles.text, selectedIndex === index ? styles.activeText : styles.inactiveText]}>
             {label}
           </Text>
         </TouchableOpacity>
       ))}
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({

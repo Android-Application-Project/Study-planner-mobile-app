@@ -26,6 +26,7 @@ export default function registerScreen({ navigation }: { navigation: any }) {
         username: username,
         email: email,
         coins: 0,
+        completedMinutes: 0,
         createdAt: new Date()
       })
 

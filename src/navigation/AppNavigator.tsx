@@ -18,15 +18,18 @@ import LogInScreen from '../screens/LogInScreen';
 import RoomForStudyTogether from '../screens/RoomForStudyTogether';
 import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
 import StatisticsScreen from '../screens/StatisticsScreen';
-import SettingScreen from '../screens/SettingScreen';
+import LegalScreen from 'src/screens/LegalScreen';
+import LeaderBoardScreen from 'src/screens/LeaderBoardScreen';
 import { configureNotificationChannelAsync, ensureNotificationPermissionsAsync } from '../utils/Notifications';
 import { useTheme } from '../utils/ThemeContext'
+import { usePreferences } from 'src/utils/PreferencesContext';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
 function Tabs() {
   const { theme } = useTheme()
+  const { strictModeEnabled } = usePreferences()
   return (
     <Tab.Navigator 
     screenOptions={({ route }) => ({
@@ -54,7 +57,28 @@ function Tabs() {
         }
       }
     })}>
-        <Tab.Screen name='Home' component={HomeScreen}/>       
+        <Tab.Screen 
+          name='Home' 
+          component={HomeScreen}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              const state = navigation.getState();
+              const homeRoute = state.routes.find((r) => r.name === 'Home');
+              const params = homeRoute?.params as any
+
+              const isActive = params?.isActive ?? false;
+
+              if (strictModeEnabled && isActive) {
+                e.preventDefault(); 
+                
+                Alert.alert(
+                  "Session Locked", 
+                  "Strict Mode is active. You must finish your session first!"
+                );
+              }
+            },
+          })}
+        />     
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
         <Tab.Screen name='Store' component={StoreScreen}/>
@@ -148,7 +172,8 @@ export default function AppNavigator() {
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
           <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{headerTitle: ''}}/>
           <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{title: 'Learning Analytics'}}/>
-          <Stack.Screen name='SettingScreen' component={SettingScreen} options={{title: 'Settings'}}/>
+          <Stack.Screen name='LegalScreen' component={LegalScreen} options={{title: 'Privacy Policy'}}/>
+          <Stack.Screen name='LeaderBoardScreen' component={LeaderBoardScreen} options={{title: ''}}/>
           <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{headerTitle: ''}}/>
         </>
       ) : (

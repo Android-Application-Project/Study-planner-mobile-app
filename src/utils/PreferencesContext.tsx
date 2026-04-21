@@ -3,21 +3,24 @@ import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications'
 
 type PreferencesContextType = {
-    vibrationEnabled: boolean;
-    setVibrationEnabled: (val: boolean) => void;
-    notificationsEnabled: boolean;
-    setNotificationsEnabled: (val: boolean) => void;
-    libraryAccessEnabled: boolean;
-    setLibraryAccessEnabled: (val: boolean) => void;
-    checkSystemNotifications: () => Promise<boolean>; 
+    vibrationEnabled: boolean
+    setVibrationEnabled: (val: boolean) => void
+    notificationsEnabled: boolean
+    setNotificationsEnabled: (val: boolean) => void
+    libraryAccessEnabled: boolean
+    setLibraryAccessEnabled: (val: boolean) => void
+    strictModeEnabled: boolean
+    setStrictModeEnabled: (val: boolean) => void
+    checkSystemNotifications: () => Promise<boolean>
 };
 
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
 
 export function PreferencesProvider({ children }: { children: ReactNode}) {
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-    const [vibrationEnabled, setVibrationEnabled] = useState(true);
-    const [libraryAccessEnabled, setLibraryAccessEnabled] = useState(true);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+    const [vibrationEnabled, setVibrationEnabled] = useState(true)
+    const [libraryAccessEnabled, setLibraryAccessEnabled] = useState(true)
+    const [strictModeEnabled, setStrictModeEnabled] = useState(false)
 
     const checkSystemNotifications = async () => {
     const settings = await Notifications.getPermissionsAsync();
@@ -27,8 +30,6 @@ export function PreferencesProvider({ children }: { children: ReactNode}) {
         settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
         settings.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED;
 
-    // Use a functional update to ensure we have the most 'fresh' state
-    // and avoid unnecessary re-renders
     setNotificationsEnabled((current) => {
         if (!isGranted && current !== false) return false;
             return current;
@@ -49,6 +50,8 @@ export function PreferencesProvider({ children }: { children: ReactNode}) {
             setNotificationsEnabled,
             libraryAccessEnabled, 
             setLibraryAccessEnabled,
+            strictModeEnabled,
+            setStrictModeEnabled,
             checkSystemNotifications
         }}>
             {children}

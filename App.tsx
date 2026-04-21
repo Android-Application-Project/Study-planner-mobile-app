@@ -5,7 +5,7 @@ import { AuthProvider } from './src/utils/AuthContext'
 import ThemeProvider from './src/utils/ThemeContext';
 import { useTheme } from './src/utils/ThemeContext';
 import { FetchSessions } from 'src/utils/FetchSessions';
-import { PreferencesProvider } from 'src/utils/SettingsContext';
+import { PreferencesProvider } from 'src/utils/PreferencesContext';
 
 function MainApp() {
   const { theme } = useTheme()
