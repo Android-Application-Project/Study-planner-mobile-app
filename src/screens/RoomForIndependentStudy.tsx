@@ -1,335 +1,383 @@
-import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing, FlatList, Image, Alert, Modal, Dimensions, ScrollView, TextInput } from 'react-native'
+import { 
+  StyleSheet, Text, View, TouchableOpacity, FlatList, Dimensions, Image, 
+  Alert, Modal, ScrollView, PanResponder, Pressable 
+} from 'react-native'
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { doc, onSnapshot, updateDoc, arrayRemove, increment, collection, addDoc, query, where, getDoc, getDocs, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import Svg, { Circle, G } from 'react-native-svg';
+import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { useTheme } from '../utils/ThemeProvider';
 import { Theme } from '../utils/Themes'; 
 
 const { width } = Dimensions.get('window');
-const QUICK_PHRASES = ["Focusing! 📚", "Break time ☕", "Almost done", "Keep going!", "BRB"];
-const EMOJIS = ["👍", "🔥", "💯", "📚", "😴", "💡"];
+
+const QUICK_MESSAGES = ["Fighting! 🔥", "Almost done 🚀", "Good Job Everyone 👏", "I'm back 🏠", "Keep Focusing 📖", "Hello", "Welcome to join us"];
+const QUICK_EMOJIS = ["❤️", "🔥", "🙌", "✨", "💯", "✅", "💤"];
+const CIRCLE_SIZE = 240; 
+const CIRCLE_RADIUS = CIRCLE_SIZE / 2;
+const RING_CENTER_R = 100; 
+const RING_WIDTH = 24; 
+const HANDLE_SIZE = 24;
+const MAX_MINUTES = 120;
+
+const PETS_DATA = {
+  elephant: { stages: { baby: require('../assets/Animal/BabyElephant.png'), child: require('../assets/Animal/ChildElephant.png'), adult: require('../assets/Animal/AdultElephant.png'), crying: require('../assets/Animal/CryingElephant.png') } },
+  crocodile: { stages: { baby: require('../assets/Animal/BabyCrocodile.png'), child: require('../assets/Animal/ChildCrocodile.png'), adult: require('../assets/Animal/AdultCrocodile.png'), crying: require('../assets/Animal/CryingCrocodile.png') } },
+  shark: { stages: { baby: require('../assets/Animal/BabyShark.png'), child: require('../assets/Animal/KidShark.png'), adult: require('../assets/Animal/AdultShark.png'), crying: require('../assets/Animal/CryingShark.png') } }
+};
+
 const AMBIENT_SOUNDS = [
-  { id: 'none', name: 'Silent', icon: 'volume-x', file: null },
-  { id: 'rain', name: 'Rain', icon: 'cloud-rain', file: require('../assets/sounds/rain.mp3') },
+  { id: 'none', name: 'None', icon: 'volume-off' },
+  { id: 'rain', name: 'Rain', icon: 'weather-pouring', file: require('../assets/sounds/rain.mp3') },
   { id: 'cafe', name: 'Cafe', icon: 'coffee', file: require('../assets/sounds/cafe.mp3') },
+  { id: 'forest', name: 'Forest', icon: 'tree', file: require('../assets/sounds/forest.mp3')  },
 ];
 
-const ProfileAvatar = ({ avatar, size, bgColor }: { avatar: string, size: number, bgColor: string }) => {
-  const radius = size / 2;
-  return (
-    <View style={{ width: size, height: size, borderRadius: radius, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-      {avatar && avatar.startsWith('http') ? (
-        <Image source={{ uri: avatar }} style={{ width: size, height: size }} />
-      ) : (
-        <Text style={{ fontSize: size * 0.4 }}>{avatar || '👤'}</Text>
-      )}
-    </View>
-  );
-};
+const ProfileAvatar = ({ avatar, size, bgColor }: { avatar: string, size: number, bgColor: string }) => (
+  <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+    {avatar && avatar.startsWith('http') ? <Image source={{ uri: avatar }} style={{ width: size, height: size }} /> : <Text style={{ fontSize: size * 0.4 }}>{avatar || '👤'}</Text>}
+  </View>
+);
 
 export default function RoomForIndependentStudy() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { roomId, roomName, icon } = route.params || {};
+  const { roomId, roomName } = route.params || {};
   const currentUserId = auth.currentUser?.uid;
+
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [roomMessages, setRoomMessages] = useState<any[]>([]);
+  const [friends, setFriends] = useState<any[]>([]);
   const [focusMinutes, setFocusMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [totalSessions, setTotalSessions] = useState(4);
   const [currentSession, setCurrentSession] = useState(1);
-  const [subject, setSubject] = useState('General Study');
-  const [timeLeft, setTimeLeft] = useState(focusMinutes * 60); 
+  const [timeLeft, setTimeLeft] = useState(25 * 60); 
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false); 
+  const [selectedPetId, setSelectedPetId] = useState('elephant');
+  const [showCryingPet, setShowCryingPet] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
+  const [selectedSoundId, setSelectedSoundId] = useState('none');
+
   const [isChatModalVisible, setChatModalVisible] = useState(false);
+  const [isInviteModalVisible, setInviteModalVisible] = useState(false);
   const [isSoundModalVisible, setSoundModalVisible] = useState(false);
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
-  const [selectedSoundId, setSelectedSoundId] = useState('none');
+
   const soundObject = useRef<Audio.Sound | null>(null);
-  const animatedTimeLeft = useRef(new Animated.Value(focusMinutes * 60)).current;
+  const timerViewRef = useRef<View>(null);
+  const circleCenterRef = useRef({ x: 0, y: 0 });
 
-  useEffect(() => {
-    Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, staysActiveInBackground: true });
-    return () => { if (soundObject.current) { soundObject.current.unloadAsync(); } };
-  }, []);
-
-  useEffect(() => {
-    if (!roomId || !db) return;
+  const handleExitRoom = async () => {
+    if (!roomId || !currentUserId) return;
     const roomRef = doc(db, 'rooms', roomId);
-    const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-      if (docSnap.exists()) { setActiveUsers(docSnap.data().activeUsers || []); }
-    });
-    return () => unsubscribe();
-  }, [roomId]);
+    const roomSnap = await getDoc(roomRef);
+    if (roomSnap.exists()) {
+      const data = roomSnap.data();
+      const updatedUsers = (data.activeUsers || []).filter((u: any) => u.id !== currentUserId);
+      await updateDoc(roomRef, {
+        activeUsers: updatedUsers,
+        members: updatedUsers.length
+      });
+    }
+  };
 
   useEffect(() => {
-    if (!roomId || !db) return;
-    const messagesRef = collection(db, 'rooms', roomId, 'messages');
-    const qLatest = query(messagesRef, orderBy('createdAt', 'desc'), limit(1));
-    const unsubscribeLatest = onSnapshot(qLatest, (snapshot) => {
-      if (!snapshot.empty) {
-        const msg = snapshot.docs[0].data();
-        if (msg.senderId !== currentUserId && !isChatModalVisible) { setUnreadCount(prev => prev + 1); }
+    if (!roomId || !currentUserId) return;
+    const roomRef = doc(db, 'rooms', roomId);
+    const unsubRoom = onSnapshot(roomRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setActiveUsers(data.activeUsers || []);
+        const newMsgs = data.messages || [];
+        if (!isChatModalVisible && newMsgs.length > roomMessages.length) {
+          if (newMsgs[newMsgs.length - 1].senderId !== currentUserId) setHasUnread(true);
+        }
+        setRoomMessages(newMsgs);
       }
     });
-    const qAll = query(messagesRef, orderBy('createdAt', 'desc'), limit(30));
-    const unsubscribeAll = onSnapshot(qAll, (snapshot) => { setMessages(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))); });
-    return () => { unsubscribeLatest(); unsubscribeAll(); };
-  }, [roomId, isChatModalVisible]);
-
-  const syncMyStatusToFirebase = async () => {
-    if (!currentUserId || !roomId) return;
-    try {
-      const roomRef = doc(db, 'rooms', roomId);
-      const roomSnap = await getDoc(roomRef);
-      if (roomSnap.exists()) {
-        const users = roomSnap.data().activeUsers || [];
-        const updatedUsers = users.map((u: any) => {
-          if (u.id === currentUserId) {
-            return { 
-                ...u, 
-                subject, 
-                status: isActive ? (isBreak ? 'Resting' : 'Focusing') : 'Paused', 
-                timeLeft, 
-                currentSession, 
-                totalSessions 
-            };
-          }
-          return u;
-        });
-        await updateDoc(roomRef, { activeUsers: updatedUsers });
+    onSnapshot(doc(db, 'users', currentUserId), async (snap) => {
+      if (snap.exists()) {
+        const userData = snap.data();
+        setSelectedPetId(userData.selectedPetId || 'elephant');
+        const fList = [];
+        for (const fid of (userData.friendIds || [])) {
+          const fSnap = await getDoc(doc(db, 'users', fid));
+          if (fSnap.exists()) fList.push({ id: fSnap.id, ...fSnap.data() });
+        }
+        setFriends(fList);
       }
+    });
+    return () => unsubRoom();
+  }, [roomId, currentUserId, isChatModalVisible, roomMessages.length]);
+
+  useEffect(() => {
+    const unsubNav = navigation.addListener('beforeRemove', (e: any) => {
+      if (!isActive) { handleExitRoom(); return; }
+      e.preventDefault();
+      Alert.alert("Abandon your pet?", "Leaving now will reset progress.", [
+        { text: "Stay", style: "cancel" },
+        { text: "Leave", style: 'destructive', onPress: () => { handleExitRoom(); navigation.dispatch(e.data.action); } }
+      ]);
+    });
+    return () => { 
+      unsubNav();
+      handleExitRoom(); 
+    };
+  }, [navigation, isActive, roomId, currentUserId]);
+
+  const playAmbientSound = async (soundId: string) => {
+    try {
+      if (soundObject.current) { await soundObject.current.stopAsync(); await soundObject.current.unloadAsync(); soundObject.current = null; }
+      const soundInfo = AMBIENT_SOUNDS.find(s => s.id === soundId);
+      if (!soundInfo || soundId === 'none') { setSelectedSoundId('none'); return; }
+      const { sound } = await Audio.Sound.createAsync(soundInfo.file, { shouldPlay: true, isLooping: true, volume: 0.5 });
+      soundObject.current = sound; setSelectedSoundId(soundId);
     } catch (e) { console.log(e); }
   };
 
-  useEffect(() => {
-    const interval = setInterval(syncMyStatusToFirebase, 5000);
-    return () => clearInterval(interval);
-  }, [isActive, isBreak, subject, timeLeft, currentSession]);
-
-  useEffect(() => {
-    let interval: any = null;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (isActive && timeLeft === 0) {
-      clearInterval(interval);
-      let nextIsBreak = !isBreak;
-      let nextSession = currentSession;
-      if (!nextIsBreak) nextSession += 1;
-      if (nextSession > totalSessions && !nextIsBreak) {
-        setIsActive(false); setIsBreak(false); setTimeLeft(focusMinutes * 60); setCurrentSession(1);
-        Alert.alert("Completed! 🎉");
-      } else {
-        setIsBreak(nextIsBreak);
-        setCurrentSession(nextSession);
-        setTimeLeft((nextIsBreak ? breakMinutes : focusMinutes) * 60);
-        setIsActive(false);
-      }
-      syncMyStatusToFirebase();
-    }
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
-
-  useEffect(() => {
-    Animated.timing(animatedTimeLeft, {
-      toValue: timeLeft,
-      duration: isActive && timeLeft > 0 ? 1000 : 0,
-      easing: Easing.linear,
-      useNativeDriver: true,
-    }).start();
-  }, [isActive, timeLeft]);
-
-  const rotateAnimation = animatedTimeLeft.interpolate({
-    inputRange: [0, (isBreak ? breakMinutes : focusMinutes) * 60],
-    outputRange: ['360deg', '0deg'],
-  });
-
-  const handleToggleTimer = () => {
-    const newActiveState = !isActive;
-    setIsActive(newActiveState);
-    setTimeout(syncMyStatusToFirebase, 500);
-  };
-
-  const handleSoundSelect = async (soundItem: any) => {
-    if (soundObject.current) { await soundObject.current.stopAsync(); await soundObject.current.unloadAsync(); soundObject.current = null; }
-    setSelectedSoundId(soundItem.id);
-    if (soundItem.id !== 'none' && soundItem.file) {
-      const { sound } = await Audio.Sound.createAsync(soundItem.file, { shouldPlay: true, isLooping: true, volume: 0.5 });
-      soundObject.current = sound;
-    }
-  };
-
-  const handleLeaveRoom = async () => {
-    if (!currentUserId || !roomId) { navigation.goBack(); return; }
-    const myUserObj = activeUsers.find(u => u.id === currentUserId);
-    if (myUserObj) { await updateDoc(doc(db, 'rooms', roomId), { members: increment(-1), activeUsers: arrayRemove(myUserObj) }); }
-    navigation.goBack();
-  };
-
-  const sendQuickMessage = async (text: string) => {
+  const sendQuickMessage = async (content: string) => {
     if (!currentUserId || !roomId) return;
-    const myUserObj = activeUsers.find(u => u.id === currentUserId);
-    await addDoc(collection(db, 'rooms', roomId, 'messages'), {
-      text, senderId: currentUserId, senderName: myUserObj?.name || 'User', senderAvatar: myUserObj?.avatar || '', createdAt: serverTimestamp()
-    });
+    const newMessage = { senderId: currentUserId, senderName: activeUsers.find((u: any) => u.id === currentUserId)?.name || 'Buddy', content, timestamp: Date.now() };
+    try { await updateDoc(doc(db, 'rooms', roomId), { messages: arrayUnion(newMessage) }); } catch (e) { console.log(e); }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const sendInvite = async (fId: string, fName: string) => {
+    try {
+      await addDoc(collection(db, 'notifications'), { receiverId: fId, senderId: currentUserId, senderName: activeUsers.find((u: any) => u.id === currentUserId)?.name || 'Buddy', roomId, roomName, status: 'unread', type: 'invite', createdAt: serverTimestamp() });
+      Alert.alert("Success", `Invite sent to ${fName}!`);
+    } catch (e) { console.log(e); }
   };
 
-  const renderMateCard = ({item}: {item: any}) => (
-    <View style={styles.mateCard}>
-      <ProfileAvatar avatar={item.avatar} size={45} bgColor="#F3F4F6" />
-      <View style={styles.mateInfo}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Text style={styles.mateName}>{item.name} {item.id === currentUserId && '(You)'}</Text>
-            {item.subject && (
-                <View style={styles.mateSubjectBadge}>
-                    <Text style={styles.mateSubjectText}>{item.subject}</Text>
-                </View>
-            )}
-        </View>
-        <Text style={styles.mateSub}>Session {item.currentSession || 1}/{item.totalSessions || 4}</Text>
-      </View>
-      <View style={styles.mateStatus}>
-        <Text style={[styles.mateTime, { color: item.status === 'Focusing' ? theme.colors.primary : '#F59E0B' }]}>{formatTime(item.timeLeft || 0)}</Text>
-        <Text style={styles.mateStatusText}>{item.status || 'Paused'}</Text>
-      </View>
-    </View>
-  );
+  const syncMyStatus = async () => {
+    if (!currentUserId || !roomId) return;
+    const roomRef = doc(db, 'rooms', roomId);
+    const snap = await getDoc(roomRef);
+    if (snap.exists()) {
+      const users = snap.data().activeUsers || [];
+      const updated = users.map((u: any) => u.id === currentUserId ? { ...u, status: isActive ? (isBreak ? 'Resting' : 'Focusing') : 'Pause', timeLeft } : u);
+      await updateDoc(roomRef, { activeUsers: updated });
+    }
+  };
+
+  useEffect(() => { syncMyStatus(); }, [isActive, isBreak, timeLeft]);
+
+  useEffect(() => {
+    let iv: any = null;
+    if (isActive && timeLeft > 0) iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    else if (isActive && timeLeft === 0) {
+      if (!isBreak) {
+        if (currentSession < totalSessions) { setIsBreak(true); setTimeLeft(breakMinutes * 60); }
+        else { setIsActive(false); setTimeLeft(focusMinutes * 60); setCurrentSession(1); Alert.alert("Congratulations!"); }
+      } else { setCurrentSession(s => s + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60); }
+    }
+    return () => clearInterval(iv);
+  }, [isActive, timeLeft, isBreak]);
+
+  const getCurrentPetImage = () => {
+    const pet = (PETS_DATA as any)[selectedPetId] || PETS_DATA.elephant;
+    if (showCryingPet) return pet.stages.crying;
+    const progress = (timeLeft / ((isBreak ? breakMinutes : focusMinutes) * 60)) * 100;
+    if (progress > 70) return pet.stages.baby;
+    if (progress <= 20) return pet.stages.adult;
+    return pet.stages.child;
+  };
+
+  const circumference = 2 * Math.PI * RING_CENTER_R;
+  const progressRatio = (isActive ? (timeLeft / 60) : focusMinutes) / MAX_MINUTES;
+  const strokeDashoffset = circumference * (1 - progressRatio);
+  const rad = (((focusMinutes / MAX_MINUTES) * 360) - 90) * (Math.PI / 180);
+  const handleX = CIRCLE_RADIUS + RING_CENTER_R * Math.cos(rad);
+  const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => !isActive,
+    onMoveShouldSetPanResponder: () => !isActive,
+    onPanResponderMove: (evt) => {
+      const { pageX, pageY } = evt.nativeEvent;
+      const { x: cx, y: cy } = circleCenterRef.current;
+      let angle = Math.atan2(pageX - cx, -(pageY - cy)) * (180 / Math.PI);
+      if (angle < 0) angle += 360;
+      let snapped = Math.round((angle / 360) * MAX_MINUTES / 5) * 5;
+      setFocusMinutes(snapped); if (!isBreak) setTimeLeft(snapped * 60);
+    },
+  }), [isActive]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={handleLeaveRoom}><Feather name="arrow-left" size={24} color={theme.colors.text1} /></TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.roomTitleText}>{icon} {roomName}</Text>
-          <View style={styles.mySubjectPill}><Text style={styles.mySubjectPillText}>{subject}</Text></View>
-        </View>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setSettingsModalVisible(true)}><Feather name="settings" size={22} color={theme.colors.text1} /></TouchableOpacity>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}><Feather name="arrow-left" size={24} color={theme.colors.text1} /></TouchableOpacity>
+        <Text style={styles.roomHeaderTitle}>{roomName}</Text>
+        <TouchableOpacity style={styles.headerIcon} onPress={() => setSoundModalVisible(true)}><MaterialCommunityIcons name="music" size={22} color={theme.colors.primary} /></TouchableOpacity>
       </View>
 
       <View style={styles.timerSection}>
-        <View style={styles.sessionDots}>
-           {[...Array(totalSessions)].map((_, i) => (
-             <View key={i} style={[styles.dot, i + 1 < currentSession && styles.dotDone, i + 1 === currentSession && styles.dotActive]} />
-           ))}
+        <View ref={timerViewRef} onLayout={() => timerViewRef.current?.measure((_fx, _fy, w, h, px, py) => { circleCenterRef.current = { x: px + w / 2, y: py + h / 2 }; })} style={styles.timerContainer} {...panResponder.panHandlers}>
+          <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
+            <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
+              <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke="rgba(0,0,0,0.05)" strokeWidth={RING_WIDTH} fill="none" />
+              <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={theme.colors.primary} strokeWidth={RING_WIDTH} fill="none" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progressRatio)} strokeLinecap="round" />
+            </G>
+          </Svg>
+          <View style={styles.timerInner} pointerEvents="none">
+            <Image source={getCurrentPetImage()} style={{ width: 100, height: 100 }} resizeMode="contain" />
+            <Text style={styles.timeTextSmall}>{formatTime(timeLeft)}</Text>
+          </View>
+          {!isActive && <View style={[styles.sliderHandle, { left: handleX - HANDLE_SIZE / 2, top: handleY - HANDLE_SIZE / 2 }]} />}
         </View>
-        <View style={styles.timerCircle}>
-          <View style={styles.timerInner}><Text style={styles.timeText}>{formatTime(timeLeft)}</Text><Text style={styles.statusLabel}>{isActive ? (isBreak ? 'BREAK' : 'FOCUS') : 'READY'}</Text></View>
-          <Animated.View style={[styles.rotator, { transform: [{ rotate: rotateAnimation }] }]}><View style={styles.progressPoint} /></Animated.View>
-        </View>
+
         <View style={styles.controlRow}>
-           <TouchableOpacity style={styles.actionBtn} onPress={() => setSoundModalVisible(true)}><Feather name="music" size={20} color={theme.colors.text1} /></TouchableOpacity>
-           <TouchableOpacity style={styles.mainBtn} onPress={handleToggleTimer}><Text style={styles.mainBtnText}>{isActive ? 'PAUSE' : 'START'}</Text></TouchableOpacity>
-           <TouchableOpacity style={styles.actionBtn} onPress={() => { setChatModalVisible(true); setUnreadCount(0); }}>
-              <Feather name="message-circle" size={20} color={theme.colors.text1} />
-              {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
-           </TouchableOpacity>
+          <TouchableOpacity style={styles.summaryBadge} onPress={() => setSettingsModalVisible(true)} disabled={isActive}>
+            <Text style={styles.summaryText}>{breakMinutes}m Rest • {currentSession}/{totalSessions} Round</Text>
+            {!isActive && <Feather name="edit-3" size={12} color={theme.colors.text2} />}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.playButton} onPress={() => {
+            if (isActive) {
+              Alert.alert("Give up? 😭", "Progress will reset!", [
+                { text: "Stay", style: "cancel" },
+                { text: "Quit", style: "destructive", onPress: () => {
+                  setIsActive(false); setIsBreak(false); setCurrentSession(1); setTimeLeft(focusMinutes * 60);
+                  setShowCryingPet(true); setTimeout(() => setShowCryingPet(false), 4000); syncMyStatus();
+                }}
+              ]);
+            } else { setIsActive(true); setShowCryingPet(false); }
+          }}><Ionicons name={isActive ? "pause" : "play"} size={24} color="#FFF" /></TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.listSection}>
-        <Text style={styles.listTitle}>Roommates ({activeUsers.length})</Text>
-        <FlatList data={activeUsers} keyExtractor={item => item.id} renderItem={renderMateCard} />
+      <View style={styles.membersSection}>
+        <View style={styles.membersHeader}>
+          <Text style={styles.membersTitle}>Roommates ({activeUsers.length})</Text>
+          <View style={{ flexDirection: 'row' }}>
+            <TouchableOpacity style={[styles.chatBtn, {marginRight: 8, backgroundColor: '#E0F2FE'}]} onPress={() => setInviteModalVisible(true)}><Feather name="user-plus" size={20} color="#0284c7" /></TouchableOpacity>
+            <TouchableOpacity style={styles.chatBtn} onPress={() => { setChatModalVisible(true); setHasUnread(false); }}><Feather name="message-circle" size={20} color={theme.colors.text1} />{hasUnread && <View style={styles.unreadBadge} />}</TouchableOpacity>
+          </View>
+        </View>
+        <FlatList data={activeUsers} keyExtractor={item => item.id} renderItem={({item}) => (
+          <View style={styles.mateCard}>
+            <ProfileAvatar avatar={item.avatar} size={40} bgColor="#F3F4F6" />
+            <View style={[styles.mateInfo, {marginLeft: 12}]}><Text style={styles.mateName}>{item.name} {item.id === currentUserId && '(You)'}</Text><Text style={styles.mateSub}>{item.status}</Text></View>
+            <View style={styles.mateTimeBox}><Text style={styles.mateTimeText}>{formatTime(item.timeLeft || 0)}</Text></View>
+          </View>
+        )} />
       </View>
 
-      <Modal visible={isSettingsModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}><View style={styles.modalContent}>
-            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Timer Settings</Text><TouchableOpacity onPress={() => setSettingsModalVisible(false)}><Feather name="x" size={24}/></TouchableOpacity></View>
-            <View style={styles.settingItem}>
-                <Text style={styles.inputLabel}>What are you focusing on?</Text>
-                <TextInput style={styles.textInput} value={subject} onChangeText={setSubject} placeholder="e.g. Coding, Math, Reading..." placeholderTextColor="#999" />
-            </View>
-            <View style={styles.settingItem}>
-                <Text style={styles.inputLabel}>Focus Minutes: {focusMinutes}</Text>
-                <View style={styles.stepper}><TouchableOpacity style={styles.stepBtn} onPress={()=>setFocusMinutes(Math.max(5, focusMinutes-5))}><Feather name="minus" size={20}/></TouchableOpacity><View style={styles.stepVal}><Text style={styles.stepValText}>{focusMinutes}</Text></View><TouchableOpacity style={styles.stepBtn} onPress={()=>setFocusMinutes(focusMinutes+5)}><Feather name="plus" size={20}/></TouchableOpacity></View>
-            </View>
-            <TouchableOpacity style={styles.confirmBtn} onPress={()=>{ setSettingsModalVisible(false); setTimeLeft(focusMinutes*60); setIsActive(false); syncMyStatusToFirebase(); }}><Text style={{color:'#FFF',fontWeight:'bold',fontSize:16}}>Apply & Reset Timer</Text></TouchableOpacity>
-        </View></View>
+      <Modal visible={isInviteModalVisible} animationType="slide" transparent>
+        <Pressable style={styles.modalOverlay} onPress={() => setInviteModalVisible(false)}>
+          <View style={[styles.modalContent, { height: '60%' }]}>
+            <View style={styles.modalHandle} /><Text style={styles.modalTitle}>Invite Friends</Text>
+            <FlatList data={friends} keyExtractor={item => item.id} renderItem={({item}) => (
+              <View style={[styles.mateCard, {backgroundColor: '#F9FAFB'}]}>
+                <ProfileAvatar avatar={item.avatar} size={40} bgColor="#EEE" />
+                <Text style={[styles.mateName, {flex: 1, marginLeft: 12}]}>{item.name || item.username}</Text>
+                <TouchableOpacity style={[styles.playButton, {width: 70, height: 35, borderRadius: 10}]} onPress={() => sendInvite(item.id, item.name || item.username)}><Text style={{color: '#FFF', fontWeight: 'bold', fontSize: 12}}>Invite</Text></TouchableOpacity>
+              </View>
+            )} ListEmptyComponent={<Text style={{textAlign: 'center', marginTop: 20, color: '#999'}}>No friends found.</Text>} />
+          </View>
+        </Pressable>
       </Modal>
 
       <Modal visible={isChatModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}><View style={[styles.modalContent, {height:'80%'}]}>
-            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Chat</Text><TouchableOpacity onPress={()=>setChatModalVisible(false)}><Feather name="x" size={24}/></TouchableOpacity></View>
-            <FlatList data={messages} inverted keyExtractor={item=>item.id} renderItem={({item}:any)=>(<View style={[styles.msgRow, item.senderId===currentUserId && {justifyContent:'flex-end'}]}><View style={[styles.msgBox, item.senderId===currentUserId ? {backgroundColor:theme.colors.primary} : {backgroundColor:'#FFF'}]}><Text style={{color:item.senderId===currentUserId?'#FFF':theme.colors.text1}}>{item.text}</Text></View></View>)} />
-            <View style={styles.quickInput}><ScrollView horizontal showsHorizontalScrollIndicator={false}>{QUICK_PHRASES.map(p=>(<TouchableOpacity key={p} onPress={()=>sendQuickMessage(p)} style={styles.quickPill}><Text style={styles.quickPillText}>{p}</Text></TouchableOpacity>))}</ScrollView></View>
-        </View></View>
+        <Pressable style={styles.modalOverlay} onPress={() => setChatModalVisible(false)}>
+          <View style={[styles.modalContent, { height: '75%' }]}>
+            <View style={styles.modalHandle} /><Text style={styles.modalTitle}>Quick Chat</Text>
+            <ScrollView style={{ flex: 1, marginBottom: 15 }} showsVerticalScrollIndicator={false}>
+              {roomMessages.map((msg, index) => (
+                <View key={index} style={{ alignSelf: msg.senderId === currentUserId ? 'flex-end' : 'flex-start', backgroundColor: msg.senderId === currentUserId ? theme.colors.primary : '#EEE', padding: 12, borderRadius: 18, marginBottom: 8, maxWidth: '80%' }}>
+                  <Text style={{ fontSize: 10, color: msg.senderId === currentUserId ? '#EEE' : '#666', marginBottom: 2 }}>{msg.senderName}</Text>
+                  <Text style={{ color: msg.senderId === currentUserId ? '#FFF' : '#000', fontWeight: '600' }}>{msg.content}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.quickChatSection}>
+              <View style={styles.emojiRow}>{QUICK_EMOJIS.map(emoji => (<TouchableOpacity key={emoji} onPress={() => sendQuickMessage(emoji)}><Text style={{ fontSize: 32 }}>{emoji}</Text></TouchableOpacity>))}</View>
+              <View style={styles.textMsgGrid}>{QUICK_MESSAGES.map(msg => (<TouchableOpacity key={msg} style={styles.quickMsgBtn} onPress={() => sendQuickMessage(msg)}><Text style={styles.quickMsgText}>{msg}</Text></TouchableOpacity>))}</View>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={isSettingsModalVisible} animationType="slide" transparent>
+        <Pressable style={styles.modalOverlay} onPress={() => setSettingsModalVisible(false)}>
+          <View style={styles.modalContent}><View style={styles.modalHandle} /><Text style={styles.modalTitle}>Timer Config</Text>
+            <View style={styles.settingRow}><View><Text style={styles.label}>Rest Time</Text><Text style={styles.subLabel}>Minutes</Text></View>
+              <View style={styles.stepper}><TouchableOpacity onPress={() => setBreakMinutes(Math.max(1, breakMinutes - 1))}><Feather name="minus" size={20}/></TouchableOpacity><Text style={styles.stepVal}>{breakMinutes}m</Text><TouchableOpacity onPress={() => setBreakMinutes(breakMinutes + 1)}><Feather name="plus" size={20}/></TouchableOpacity></View>
+            </View>
+            <View style={styles.settingRow}><View><Text style={styles.label}>Total Rounds</Text><Text style={styles.subLabel}>Sessions</Text></View>
+              <View style={styles.stepper}><TouchableOpacity onPress={() => setTotalSessions(Math.max(1, totalSessions - 1))}><Feather name="minus" size={20}/></TouchableOpacity><Text style={styles.stepVal}>{totalSessions}</Text><TouchableOpacity onPress={() => setTotalSessions(totalSessions + 1)}><Feather name="plus" size={20}/></TouchableOpacity></View>
+            </View>
+            <TouchableOpacity style={styles.confirmBtn} onPress={() => {setSettingsModalVisible(false); syncMyStatus();}}><Text style={{color: '#FFF', fontWeight: 'bold'}}>Done</Text></TouchableOpacity>
+          </View>
+        </Pressable>
       </Modal>
 
       <Modal visible={isSoundModalVisible} animationType="fade" transparent>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={()=>setSoundModalVisible(false)}><View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, {marginBottom:20}]}>Ambient Sounds</Text>
-            {AMBIENT_SOUNDS.map(s=>(<TouchableOpacity key={s.id} onPress={()=>handleSoundSelect(s)} style={[styles.soundRow, selectedSoundId===s.id && {backgroundColor:'#E5EDDF'}]}><Feather name={s.icon as any} size={20} color={theme.colors.text1}/><Text style={{marginLeft:15, fontWeight:'600', color:theme.colors.text1}}>{s.name}</Text></TouchableOpacity>))}
-        </View></TouchableOpacity>
+        <Pressable style={styles.modalOverlay} onPress={() => setSoundModalVisible(false)}>
+          <View style={styles.modalContent}><View style={styles.modalHandle} /><Text style={styles.modalTitle}>Ambient Sounds</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {AMBIENT_SOUNDS.map((s) => (
+                <TouchableOpacity key={s.id} style={{ width: '48%', backgroundColor: selectedSoundId === s.id ? theme.colors.primary : '#F3F4F6', padding: 15, borderRadius: 20, alignItems: 'center', marginBottom: 15, flexDirection: 'row', justifyContent: 'center' }} onPress={() => playAmbientSound(s.id)}>
+                  <MaterialCommunityIcons name={s.icon as any} size={20} color={selectedSoundId === s.id ? '#FFF' : theme.colors.text2} style={{ marginRight: 8 }} />
+                  <Text style={{ fontWeight: 'bold', color: selectedSoundId === s.id ? '#FFF' : theme.colors.text1 }}>{s.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.confirmBtn} onPress={() => setSoundModalVisible(false)}><Text style={{ color: '#FFF', fontWeight: 'bold' }}>Close</Text></TouchableOpacity>
+          </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
 }
 
+const formatTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10 },
-  iconBtn: { padding: 10, backgroundColor: '#FFF', borderRadius: 20, elevation: 2 },
-  titleContainer: { alignItems: 'center' },
-  roomTitleText: { fontSize: 18, fontWeight: '800', color: theme.colors.text1 },
-  mySubjectPill: { backgroundColor: '#E5EDDF', paddingVertical: 2, paddingHorizontal: 10, borderRadius: 10, marginTop: 4 },
-  mySubjectPillText: { fontSize: 10, fontWeight: '700', color: theme.colors.primary },
-  timerSection: { alignItems: 'center', paddingVertical: 20 },
-  sessionDots: { flexDirection: 'row', marginBottom: 20 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#DDD', marginHorizontal: 4 },
-  dotDone: { backgroundColor: theme.colors.text1 },
-  dotActive: { backgroundColor: theme.colors.primary, transform: [{scale: 1.2}] },
-  timerCircle: { width: 260, height: 260, borderRadius: 130, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5 },
-  timerInner: { alignItems: 'center' },
-  timeText: { fontSize: 60, fontWeight: '200', color: theme.colors.text1, fontVariant:['tabular-nums'] },
-  statusLabel: { fontSize: 14, fontWeight: '800', letterSpacing: 3, color: theme.colors.primary },
-  rotator: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-start', alignItems: 'center' },
-  progressPoint: { width: 14, height: 14, borderRadius: 7, backgroundColor: theme.colors.primary, marginTop: -7, borderWidth: 3, borderColor: '#FFF' },
-  controlRow: { flexDirection: 'row', alignItems: 'center', marginTop: 30 },
-  actionBtn: { width: 45, height: 45, borderRadius: 23, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 3, position: 'relative' },
-  mainBtn: { backgroundColor: theme.colors.text1, paddingHorizontal: 40, paddingVertical: 15, borderRadius: 30, marginHorizontal: 20, elevation: 5 },
-  mainBtnText: { color: '#FFF', fontWeight: '800', letterSpacing: 1 },
-  badge: { position: 'absolute', top: -5, right: -5, backgroundColor: '#FF4B4B', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
-  listSection: { flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 25, elevation: 10 },
-  listTitle: { fontSize: 16, fontWeight: '800', marginBottom: 15, color: theme.colors.text1 },
-  mateCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  mateInfo: { flex: 1, marginLeft: 15 },
-  mateName: { fontSize: 15, fontWeight: '700', color: theme.colors.text1 },
-  mateSubjectBadge: { backgroundColor: '#F3F4F6', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 6, marginLeft: 8 },
-  mateSubjectText: { fontSize: 10, fontWeight: '600', color: theme.colors.text2 },
-  mateSub: { fontSize: 12, color: theme.colors.text2, marginTop: 2 },
-  mateStatus: { alignItems: 'flex-end' },
-  mateTime: { fontSize: 14, fontWeight: 'bold' },
-  mateStatusText: { fontSize: 10, color: '#AAA' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+  backBtn: { padding: 8, backgroundColor: theme.colors.card, borderRadius: 12 },
+  roomHeaderTitle: { fontSize: 18, fontWeight: '800', color: theme.colors.text1 },
+  headerIcon: { padding: 8, backgroundColor: theme.colors.card, borderRadius: 12 },
+  timerSection: { alignItems: 'center', marginTop: 10 },
+  timerContainer: { width: CIRCLE_SIZE, height: CIRCLE_SIZE, justifyContent: 'center', alignItems: 'center' },
+  timerInner: { position: 'absolute', alignItems: 'center' },
+  timeTextSmall: { fontSize: 26, fontWeight: 'bold', color: theme.colors.text1, marginTop: 5 },
+  sliderHandle: { position: 'absolute', width: HANDLE_SIZE, height: HANDLE_SIZE, borderRadius: HANDLE_SIZE/2, backgroundColor: '#FFF', borderWidth: 4, borderColor: theme.colors.primary, elevation: 5 },
+  controlRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, width: '90%', justifyContent: 'space-between' },
+  summaryBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 12, borderRadius: 20, flex: 1, marginRight: 15, elevation: 2 },
+  summaryText: { fontSize: 13, fontWeight: '700', color: theme.colors.text1, marginRight: 10 },
+  playButton: { width: 50, height: 50, borderRadius: 25, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center' },
+  membersSection: { flex: 1, backgroundColor: '#FFF', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 20, marginTop: 20, elevation: 10 },
+  membersHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  membersTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.text1 },
+  chatBtn: { padding: 10, backgroundColor: '#F3F4F6', borderRadius: 12, position: 'relative' },
+  unreadBadge: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#FFF' },
+  mateCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, backgroundColor: '#F9FAFB', padding: 12, borderRadius: 15 },
+  mateInfo: { flex: 1 },
+  mateName: { fontSize: 14, fontWeight: '700', color: theme.colors.text1 },
+  mateSub: { fontSize: 12, color: theme.colors.text2 },
+  mateTimeBox: { backgroundColor: '#E5EDDF', padding: 6, borderRadius: 10 },
+  mateTimeText: { fontSize: 13, fontWeight: 'bold', color: theme.colors.primary },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#F7F9F5', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text1 },
-  settingItem: { marginBottom: 25 },
-  inputLabel: { fontSize: 14, fontWeight: '700', color: theme.colors.text1, marginBottom: 10 },
-  textInput: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, fontSize: 16, color: theme.colors.text1, elevation: 1 },
-  stepper: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
-  stepBtn: { width: 45, height: 45, backgroundColor: '#FFF', borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  stepVal: { marginHorizontal: 20 },
-  stepValText: { fontSize: 18, fontWeight: 'bold', color: theme.colors.text1 },
-  confirmBtn: { backgroundColor: theme.colors.primary, padding: 18, borderRadius: 20, alignItems: 'center', marginTop: 10, elevation: 3 },
-  msgRow: { flexDirection: 'row', marginBottom: 10 },
-  msgBox: { padding: 12, borderRadius: 15, maxWidth: '80%', elevation: 1 },
-  quickInput: { borderTopWidth: 1, borderColor: '#EEE', paddingTop: 15 },
-  quickPill: { paddingHorizontal: 15, paddingVertical: 8, backgroundColor: '#E5EDDF', borderRadius: 20, marginRight: 10 },
-  quickPillText: { fontWeight: '600', color: theme.colors.text1 },
-  soundRow: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 15, marginBottom: 10, backgroundColor: '#FFF' }
+  modalContent: { backgroundColor: '#FFF', padding: 25, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
+  modalHandle: { width: 40, height: 5, backgroundColor: '#DDD', borderRadius: 5, alignSelf: 'center', marginBottom: 15 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: theme.colors.text1 },
+  quickChatSection: { borderTopWidth: 1, borderColor: '#EEE', paddingTop: 15 },
+  emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
+  textMsgGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  quickMsgBtn: { backgroundColor: '#F3F4F6', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 20, margin: 5 },
+  quickMsgText: { fontSize: 13, fontWeight: '600', color: theme.colors.text1 },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, backgroundColor: '#FFF', padding: 15, borderRadius: 20 },
+  label: { fontSize: 16, fontWeight: '700', color: theme.colors.text1 },
+  subLabel: { fontSize: 12, color: '#999' },
+  stepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', padding: 5, borderRadius: 15 },
+  stepVal: { fontSize: 16, fontWeight: '800', width: 55, textAlign: 'center' },
+  confirmBtn: { backgroundColor: theme.colors.primary, padding: 15, borderRadius: 20, alignItems: 'center' },
 });
