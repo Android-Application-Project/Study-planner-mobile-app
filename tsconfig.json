@@ -3,15 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "jsx": "react-native",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true
-  },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx"
-  ]
+    "paths": {
+      "firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
+    }
+  }
 }
