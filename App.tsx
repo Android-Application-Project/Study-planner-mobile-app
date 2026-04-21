@@ -1,16 +1,18 @@
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme as NavDefaultTheme } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
-import ThemeProvider from './src/utils/ThemeProvider';
-import { useTheme } from './src/utils/ThemeProvider';
-import './src/utils/Notifications';
+import { AuthProvider } from './src/utils/AuthContext'
+import ThemeProvider from './src/utils/ThemeContext';
+import { useTheme } from './src/utils/ThemeContext';
+import { FetchSessions } from 'src/utils/FetchSessions';
+import { PreferencesProvider } from 'src/utils/PreferencesContext';
 
 function MainApp() {
   const { theme } = useTheme()
    const navTheme = {
-    ...NavDefaultTheme, // Start with the correct React Navigation structure
+    ...NavDefaultTheme, 
     colors: {
-      ...NavDefaultTheme.colors, // Include required fields like 'border', 'notification'
+      ...NavDefaultTheme.colors, 
       background: theme.colors.background,
       primary: theme.colors.primary,
       card: theme.colors.text2,
@@ -19,9 +21,11 @@ function MainApp() {
   };
   
   return (
-    <NavigationContainer theme={navTheme}>
-      <AppNavigator/>
-    </NavigationContainer>
+    <FetchSessions>
+      <NavigationContainer theme={navTheme}>
+        <AppNavigator/>
+      </NavigationContainer>
+    </FetchSessions>
   );
 }
 
@@ -29,7 +33,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <MainApp />
+        <PreferencesProvider>
+          <AuthProvider>
+            <MainApp />
+          </AuthProvider>
+        </PreferencesProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   )

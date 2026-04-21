@@ -1,10 +1,10 @@
-import { Alert, StyleSheet } from 'react-native'
-import { useEffect, useRef, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { Alert, StyleSheet, ActivityIndicator, View, Platform} from 'react-native'
+import { useEffect, useRef } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db } from '../../firebaseConfig';
+import { useAuth } from '../utils/AuthContext';
+import { db } from '../../firebaseConfig';
 import { Octicons, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen'
 import MenuScreen from '../screens/MenuScreen'
@@ -17,17 +17,31 @@ import RegisterScreen from '../screens/RegisterScreen';
 import LogInScreen from '../screens/LogInScreen';
 import RoomForStudyTogether from '../screens/RoomForStudyTogether';
 import RoomForIndependentStudy from '../screens/RoomForIndependentStudy';
+import StatisticsScreen from '../screens/StatisticsScreen';
+import LegalScreen from 'src/screens/LegalScreen';
+import LeaderBoardScreen from 'src/screens/LeaderBoardScreen';
 import { configureNotificationChannelAsync, ensureNotificationPermissionsAsync } from '../utils/Notifications';
+import { useTheme } from '../utils/ThemeContext'
+import { usePreferences } from 'src/utils/PreferencesContext';
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
-function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
+function Tabs() {
+  const { theme } = useTheme()
+  const { strictModeEnabled } = usePreferences()
   return (
     <Tab.Navigator 
     screenOptions={({ route }) => ({
       headerShown: false,
       tabBarShowLabel: false,
+      tabBarStyle: {
+        backgroundColor: theme.colors.background,
+        borderTopWidth: 2,
+        borderTopColor: theme.colors.secondary1,
+        height: Platform.OS === 'ios' ? 90 : 70,
+        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+      },
       tabBarIcon: ({ focused, color }) => {
         switch (route.name) {
           case 'Home':
@@ -43,21 +57,41 @@ function Tabs({ setIsLoggedIn }: { setIsLoggedIn: (val: boolean) => void }) {
         }
       }
     })}>
-        <Tab.Screen name='Home' component={HomeScreen}/>       
+        <Tab.Screen 
+          name='Home' 
+          component={HomeScreen}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              const state = navigation.getState();
+              const homeRoute = state.routes.find((r) => r.name === 'Home');
+              const params = homeRoute?.params as any
+
+              const isActive = params?.isActive ?? false;
+
+              if (strictModeEnabled && isActive) {
+                e.preventDefault(); 
+                
+                Alert.alert(
+                  "Session Locked", 
+                  "Strict Mode is active. You must finish your session first!"
+                );
+              }
+            },
+          })}
+        />     
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
         <Tab.Screen name='Store' component={StoreScreen}/>
-        <Tab.Screen name='Menu' options={{ headerShown: false}}>
-              {(props) => <MenuScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
-        </Tab.Screen>
+        <Tab.Screen name='Menu' component={MenuScreen}/>
     </Tab.Navigator>
   )
 }
 
 export default function AppNavigator() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const { user, loading } = useAuth()
+  const { theme } = useTheme()
   const promptedUserRef = useRef<string | null>(null)
-
+  
   useEffect(() => {
     const maybePromptForNotifications = async (userId: string) => {
       if (promptedUserRef.current === userId) return
@@ -110,36 +144,46 @@ export default function AppNavigator() {
       )
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user)
-      if (user) {
-        void maybePromptForNotifications(user.uid)
-      } else {
-        promptedUserRef.current = null
-      }
-    })
-    return unsubscribe
-  }, [])
+    if (user?.uid) {
+      void maybePromptForNotifications(user.uid)
+    } else {
+      promptedUserRef.current = null
+    }
+  }, [user?.uid])
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+  )
+}
 
   return (
-    <Stack.Navigator>
-      {isLoggedIn ? (
+    <Stack.Navigator screenOptions={{
+      headerStyle: {
+        backgroundColor: theme.colors.background, 
+      },
+      headerShadowVisible: false,
+    }}>
+      {user ? (
         <>
-          <Stack.Screen name='Tabs' options={{ headerShown: false }}>
-            {(props) => <Tabs {...props} setIsLoggedIn={setIsLoggedIn} />}
-          </Stack.Screen>          
+          <Stack.Screen name='Tabs' component={Tabs} options={{ headerShown: false }}/>
           <Stack.Screen name='CalendarScreen' component={CalendarScreen}/>
-          <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{ headerShown: false}}/>
-          <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{ headerShown: false}}/>
+          <Stack.Screen name='RoomForStudyTogether' component={RoomForStudyTogether} options={{headerTitle: ''}}/>
+          <Stack.Screen name='StatisticsScreen' component={StatisticsScreen} options={{title: 'Learning Analytics'}}/>
+          <Stack.Screen name='LegalScreen' component={LegalScreen} options={{title: 'Privacy Policy'}}/>
+          <Stack.Screen name='LeaderBoardScreen' component={LeaderBoardScreen} options={{title: ''}}/>
+          <Stack.Screen name='RoomForIndependentStudy' component={RoomForIndependentStudy} options={{headerTitle: ''}}/>
         </>
       ) : (
         <>
           <Stack.Screen name='FirstScreen' component={FirstScreen} options={{ headerShown: false }}/>
           <Stack.Screen name='RegisterScreen' options={{ headerShown: false }}>
-            {(props) => <RegisterScreen {...props} setIsLoggedIn={setIsLoggedIn} />}
+            {(props) => <RegisterScreen {...props} />}
           </Stack.Screen>  
           <Stack.Screen name="LoginScreen" options={{ headerShown: false }}>
-            {(props) => <LogInScreen {...props} setIsLoggedIn={setIsLoggedIn}/>}
+            {(props) => <LogInScreen {...props}/>}
           </Stack.Screen>       
         </>
       )}

@@ -6,7 +6,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { doc, onSnapshot, updateDoc, arrayRemove, increment, collection, addDoc, query, where, getDoc, getDocs, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'; 
 
 const { width } = Dimensions.get('window');

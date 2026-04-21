@@ -1,47 +1,72 @@
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, TextInput, Image } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, TextInput, Image, Switch } from 'react-native'
 import { useMemo, useState, useEffect } from 'react'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { AuthProps } from '../types/Auth'
 import { auth, db } from '../../firebaseConfig'
-import { doc, onSnapshot, serverTimestamp, setDoc, getDoc } from 'firebase/firestore'
+import { signOut } from 'firebase/auth'
+import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useSessions } from 'src/utils/FetchSessions'
+import { useNavigation, NavigationProp } from '@react-navigation/native'
+import { usePreferences } from 'src/utils/PreferencesContext'
 
 const DEFAULT_AVATAR = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
 
 type UserData = {
   username: string
   avatar: string
-  level: number
+  coins: number
 }
 
-export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
+export default function MenuScreen() {
     const { theme } = useTheme()
     const styles = useMemo(() => createStyles(theme), [theme])
+    const navigation = useNavigation<NavigationProp<any>>();
 
-    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...', level: 1 })
-    const [loading, setLoading] = useState(false)
+    const { sessions } = useSessions()
+
+    const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...', completedMinutes: 0 })
+    const [avatarLoading, setAvatarLoading] = useState(false)
+    const [usernameLoading, setUsernameLoading] = useState(false)
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
     const [avatarPopupVisible, setAvatarPopupVisible] = useState(false)
-    
-    const[newName, setNewName] = useState('')
+
+    const[newName, setNewName] = useState('') 
+
+    const { 
+        vibrationEnabled, setVibrationEnabled,
+        notificationsEnabled, setNotificationsEnabled,
+        libraryAccessEnabled, setLibraryAccessEnabled,
+        strictModeEnabled, setStrictModeEnabled,
+        checkSystemNotifications
+    } = usePreferences()
+
+    const handleNotificationChange = async (value: boolean) => {
+        if (value) {
+            const isSystemAllowed = await checkSystemNotifications();
+            if (!isSystemAllowed) {
+                return
+            }
+        }
+        setNotificationsEnabled(value);
+    }  
 
     useEffect(() => {
         const user = auth.currentUser
-        if (!user) return
+        if (!user) throw new Error('No user is logged in')
 
         const docRef = doc(db, 'users', user.uid)
 
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData
-                console.log('onSnapshot fired, new avatar:', data.avatar)
-                setUserData(data)
+                setUserData(prev => ({ ...prev, ...data }))
                 setNewName(data.username)
             }
         })
@@ -49,7 +74,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
     }, [])
 
     const pickImage = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync()
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
         if (status !== 'granted') {
             Alert.alert('Permission Denied', 'We need camera roll permissions to upload a photo.')
             return
@@ -76,7 +101,7 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
     }
 
     const uploadImage = async (uri: string) => {
-        setLoading(true)
+        setAvatarLoading(true)
         try {
             const user = auth.currentUser
             if (!user) return
@@ -118,42 +143,74 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
             console.error('Upload error: ', err)
             Alert.alert('Upload failed', err.message)
         } finally {
-            setLoading(false)
+            setAvatarLoading(false)
         }
     } 
 
     const handleUpdate = async (field: 'username' | 'avatar', value: string) => {
         if (!value.trim()) return Alert.alert('Error', 'Field cannot be empty')
-        setLoading(true)
+        if (field === 'avatar') setAvatarLoading(true)
+        if (field === 'username') setUsernameLoading(true)
         try {
             const user = auth.currentUser
-            if (!user) throw new Error('No user is logged in')
+            if (!user) return
             const docRef = doc(db, 'users', user.uid)
-
-            console.log('Updating Firestore:', field, value)
 
             await setDoc(docRef, {
                 [field]: value,
                 updatedAt: serverTimestamp()
             }, { merge: true })
 
-            console.log('Firestore update successful')
-
-            // Add direct read to verify
-            const docSnap = await getDoc(docRef)
-            if (docSnap.exists()) {
-                const data = docSnap.data()
-                console.log('Direct read after update:', data.avatar)
-            }
-
             setNamePopupVisible(false)
             setAvatarPopupVisible(false)
         } catch (err: any) {
             Alert.alert('Error updating profile', err.message)
         } finally {
-            setLoading(false)
+            setAvatarLoading(false)
+            setUsernameLoading(false)
         }
     }
+
+    const streak = useMemo(() => {
+    if (!sessions || sessions.length === 0) return 0;
+
+    const completedDates = new Set<string>();
+
+    sessions.forEach(s => {
+        if (s.completed) {
+        completedDates.add(s.date);
+        }
+    });
+
+    let count = 0;
+    const current = new Date();
+
+    const todayStr = current.toISOString().split("T")[0];
+    if (!completedDates.has(todayStr)) {
+        current.setDate(current.getDate() - 1);
+    }
+
+    while (true) {
+        const dateStr = current.toISOString().split("T")[0];
+
+        if (completedDates.has(dateStr)) {
+        count++;
+        current.setDate(current.getDate() - 1);
+        } else {
+        break;
+        }
+    }
+
+    return count;
+    }, [sessions]);
+
+    const completedRatio = sessions.length > 0
+        ? Math.round((sessions.filter( session => session.completed).length / sessions.length) * 100)
+        : 0
+
+    const completedMinutes = userData.completedMinutes || 0
+
+    const completedHours = (completedMinutes / 60).toFixed(1)
 
     return (
         <SafeAreaView style={styles.container}>
@@ -169,53 +226,122 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                     </TouchableOpacity>
                     <View>
                         <View style={styles.editName}>
-                            <Text style={styles.userName} onPress={() => setNamePopupVisible(true)}>{userData.username}</Text>
-                            <Feather name="edit-3" size={20} color="white" />
+                            <Text style={styles.userName}>{userData.username}</Text>
+                            <Feather name="edit-3" size={20} color="white" onPress={() => setNamePopupVisible(true)}/>
                         </View>
-                        <Text style={styles.userLevel}>{userData.level <= 3 ? 'Newbie feeder' : 'Senior feeder'}</Text>
                     </View>
                 </View>
 
                 <View style={styles.statsRow}>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>48h</Text>
-                        <Text style={styles.statLabel}>This Week</Text>
+                        <Text style={styles.statValue}>{streak}</Text>
+                        <Text style={styles.statLabel}>Streak</Text>
                     </View>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>85%</Text>
+                        <Text style={styles.statValue}>{completedRatio}%</Text>
                         <Text style={styles.statLabel}>Completed</Text>
                     </View>
                     <View style={styles.statBox}>
-                        <Text style={styles.statValue}>142</Text>
-                        <Text style={styles.statLabel}>Total</Text>
+                        <Text style={styles.statValue}>{completedHours}</Text>
+                        <Text style={styles.statLabel}>Total Hours</Text>
                     </View>
                 </View>
 
-                <View style={styles.menuList}>
-                    <MenuLink 
-                        icon="bar-chart-outline" 
-                        title="Statistics" 
-                        subtitle="View your study analytics" 
-                        styles={styles} 
-                        iconBg="#A8C2A0"
-                    />
-                    <MenuLink 
-                        icon="settings-outline" 
-                        title="Settings" 
-                        subtitle="App preferences & notifications" 
-                        styles={styles} 
-                        iconBg="#A8C2A0"
-                    />
-                    <MenuLink 
-                        icon="document-text-outline" 
-                        title="Terms & Privacy" 
-                        subtitle="Legal information & GDPR" 
-                        styles={styles} 
-                        iconBg="#DEE6D3"
-                    />
+                <View style={{ marginTop: 10 }}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>PREFERENCES</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <MaterialIcons name="vibration" size={24} color="#556B52" />
+                                <Text style={styles.settingText}>Vibration</Text>
+                            </View>
+                            <Switch 
+                                value={vibrationEnabled} 
+                                onValueChange={setVibrationEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="notifications-outline" size={22} color="#556B52" />
+                                <Text style={styles.settingText}>Notifications</Text>
+                            </View>
+                            <Switch 
+                                value={notificationsEnabled} 
+                                onValueChange={handleNotificationChange}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="lock-closed-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Strict Mode</Text>
+                            </View>
+                            <Switch 
+                                value={strictModeEnabled} 
+                                onValueChange={setStrictModeEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <Feather name="folder" size={22} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Library Access</Text>
+                            </View>
+                            <Switch 
+                                value={libraryAccessEnabled} 
+                                onValueChange={setLibraryAccessEnabled}
+                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                            />
+                        </View>
+                    </View>
                 </View>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={() => setIsLoggedIn(false)}>
+                <View style={{ marginTop: 10 }}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>STATISTICS</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('StatisticsScreen')}>
+                            <View style={styles.settingLeft}>
+                                <Ionicons name="bar-chart-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Analytics</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('LeaderBoardScreen')}>
+                            <View style={styles.settingLeft}>
+                                <MaterialIcons name="leaderboard" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Leader Board</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+
+                <TouchableOpacity style={{ marginTop: 10 }} onPress={() => navigation.navigate('LegalScreen')}>
+                    <Text style={[styles.statLabel, { marginBottom: 10, marginLeft: 5 }]}>PRIVACY POLICY</Text>
+                    
+                    <View style={styles.settingsGroup}>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>  
+                                <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
+                                <Text style={styles.settingText}>Privacy Policy Document</Text>
+                            </View>
+                            
+                            <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(auth)}>
                     <Ionicons name="exit-outline" size={20} color="#6B8E7D" style={{marginRight: 8}} />
                     <Text style={styles.logoutText}>Log Out</Text>
                 </TouchableOpacity>
@@ -243,9 +369,9 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                             <TouchableOpacity
                                 style={styles.saveBtn}
                                 onPress={() => handleUpdate('username', newName)}
-                                disabled={loading}
+                                disabled={usernameLoading}
                             >
-                                {loading ? <ActivityIndicator color={theme.colors.text1}/> : <Text style={styles.saveBtnText}>Save</Text>}
+                                {usernameLoading ? <ActivityIndicator color={theme.colors.text1}/> : <Text style={styles.saveBtnText}>Save</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -260,8 +386,8 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                             source={{ uri: userData.avatar || DEFAULT_AVATAR}}
                             style={styles.avatarImage}
                         />
-                        <TouchableOpacity style={styles.uploadOption} onPress={pickImage} disabled={loading}>
-                            {loading ? (
+                        <TouchableOpacity style={styles.uploadOption} onPress={pickImage} disabled={avatarLoading}>
+                            {avatarLoading ? (
                                 <ActivityIndicator color="#007AFF" />
                             ) : (
                                 <>
@@ -277,12 +403,10 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
                         <TouchableOpacity
                             style={styles.cancelBtn2}
                             onPress={() => setAvatarPopupVisible(false)}
-                            disabled={loading}    
+                            disabled={avatarLoading}    
                         >
                             <Text style={{ fontWeight: '600' }}>Close</Text>
                         </TouchableOpacity>
-
-                        
                     </View>
                 </View>
             </Modal>
@@ -290,20 +414,6 @@ export default function MenuScreen({ setIsLoggedIn }: AuthProps) {
         </SafeAreaView>
     )
 }
-
-// Sub-component for Menu Items
-const MenuLink = ({ icon, title, subtitle, styles, iconBg }: any) => (
-    <TouchableOpacity style={styles.menuItem}>
-        <View style={[styles.menuIconContainer, {backgroundColor: iconBg}]}>
-            <Ionicons name={icon} size={22} color="#4A5D45" />
-        </View>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.menuItemTitle}>{title}</Text>
-            <Text style={styles.menuItemSubtitle}>{subtitle}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
-    </TouchableOpacity>
-)
 
 const createStyles = (theme: Theme) => StyleSheet.create({
     container: {
@@ -462,5 +572,32 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     uploadOption: { marginTop: 10, flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: '#F0F7FF', borderRadius: 12, width: '100%', justifyContent: 'center', marginBottom: 10 },
     uploadOptionText: { marginLeft: 10, color: '#007AFF', fontWeight: 'bold' },
     avatarImage: { width: 70, height: 70, borderRadius: 35 },
-
+    settingsGroup: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        paddingHorizontal: 15,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+    },
+    settingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+    },
+    settingLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    settingText: {
+        fontSize: 16,
+        color: '#2D3A29',
+        fontWeight: '500',
+    },
 })

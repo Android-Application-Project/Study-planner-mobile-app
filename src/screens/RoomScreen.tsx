@@ -6,7 +6,7 @@ import SegmentedControl from '../components/SegmentedControl'
 import FriendScreen from './FriendScreen'
 import { Feather } from '@expo/vector-icons'; 
 
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes';
 
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, where, getDoc, updateDoc, increment, arrayUnion, deleteDoc } from 'firebase/firestore';

@@ -3,7 +3,7 @@ import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react
 import { Calendar } from 'react-native-calendars'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { auth, db } from '../../firebaseConfig'
 import { syncScheduleNotificationsAsync } from '../utils/Notifications'
