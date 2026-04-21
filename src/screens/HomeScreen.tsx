@@ -1,16 +1,19 @@
 import {
-  StyleSheet, Text, View, TouchableOpacity, Modal, Pressable, ScrollView, PanResponder, Alert, FlatList, Dimensions, Image 
+  StyleSheet, Text, View, TouchableOpacity, Modal, Pressable, Vibration, PanResponder, Alert, FlatList, Dimensions, Image 
 } from 'react-native'
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
+import { useNavigation } from '@react-navigation/native'
 import { Feather, FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons'
 import DropDownPicker from 'react-native-dropdown-picker'
 import Svg, { Circle, G } from 'react-native-svg'
 import { Audio } from 'expo-av'
-import { doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore'
+import { doc, updateDoc, onSnapshot, getDoc, increment } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from 'src/utils/ThemeContext'
 import { Theme } from '../utils/Themes'
+import { usePreferences } from 'src/utils/PreferencesContext'
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +71,9 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const USER_ID = auth.currentUser?.uid;
+  const navigation = useNavigation<BottomTabNavigationProp<any>>()
+
+  const { vibrationEnabled, strictModeEnabled } = usePreferences()
 
   const [streak, setStreak] = useState(0);
   const [lastFocusDate, setLastFocusDate] = useState<string | null>(null);
@@ -188,21 +194,69 @@ export default function HomeScreen() {
     if (isActive && timeLeft > 0) {
       iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
     } else if (isActive && timeLeft === 0) {
-      if (!isBreak) {
-        if (currentRound < totalRounds) {
-          setIsBreak(true); setTimeLeft(breakMinutes * 60);
-          Alert.alert("Break Time!");
-        } else {
-          setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
-          handleUpdateStreak(); 
-          Alert.alert("Mission Complete!");
-        }
-      } else {
-        setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
+
+      if (vibrationEnabled) {
+        const VIBRATION_PATTERN = [0, 500, 200, 500]
+        Vibration.vibrate(VIBRATION_PATTERN)
       }
+
+      const COINS_PER_MINUTE = 1
+      const earnedCoins = focusMinutes * COINS_PER_MINUTE
+
+      updateDoc(doc(db, 'users', USER_ID as string), {
+        coins: increment(earnedCoins),
+        completedMinutes: increment(focusMinutes)
+      })
+
+      setTimeout(() => {
+        if (!isBreak) {
+          if (currentRound < totalRounds) {
+            setIsBreak(true); setTimeLeft(breakMinutes * 60);
+            Alert.alert("Break Time!");
+          } else {
+            setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
+            handleUpdateStreak(); 
+            Alert.alert("Mission Complete!");
+          }
+        } else {
+          setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
+        }
+      }, 100)
     }
     return () => clearInterval(iv);
   }, [isActive, timeLeft, isBreak, currentRound, totalRounds]);
+
+  useEffect(() => {
+    navigation.setParams({ isTimerActive: isActive });
+  }, [isActive, navigation]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, (e: any) => {
+      
+      if (strictModeEnabled && isActive) {
+        e.preventDefault();
+
+        Alert.alert(
+          'Session Locked',
+          'Strict Mode is active!',
+          [
+            { text: 'Stay Focused', style: 'cancel' },
+            {
+              text: 'Quit & Leave',
+              style: 'destructive',
+              onPress: () => {
+                setIsActive(false); 
+                setIsBreak(false);
+                setTimeLeft(focusMinutes * 60);            
+              },
+            },
+          ]
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, strictModeEnabled, isActive])
 
   useEffect(() => { syncToFirebase(); }, [currentMode, isActive, isBreak, selectedPetId]);
 
@@ -247,8 +301,10 @@ export default function HomeScreen() {
       let angle = Math.atan2(pageX - cx, -(pageY - cy)) * (180 / Math.PI);
       if (angle < 0) angle += 360;
       let snapped = Math.round(((angle / 360) * MAX_MINUTES) / STEP_MINUTES) * STEP_MINUTES;
-      setFocusMinutes(snapped);
-      if (!isBreak) setTimeLeft(snapped * 60);
+      if (snapped !== focusMinutes) {
+        setFocusMinutes(snapped);
+        if (!isBreak) setTimeLeft(snapped * 60);
+      }
     }
   }), [isActive, isBreak]);
 

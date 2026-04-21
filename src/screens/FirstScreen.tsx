@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated } from 'react-native'
 import { useMemo, useEffect, useRef } from 'react'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 
 const { width, height } = Dimensions.get('window')

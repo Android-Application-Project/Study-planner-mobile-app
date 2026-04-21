@@ -30,4 +30,3 @@ export function useThemeStyle<T>(stylesFactory: (theme: Theme) => T) {
 
     return useMemo(() => stylesFactory(theme), [theme, stylesFactory])
 }
-
