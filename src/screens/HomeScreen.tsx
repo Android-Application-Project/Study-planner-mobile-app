@@ -108,6 +108,8 @@ export default function HomeScreen() {
   const [totalFocusSeconds, setTotalFocusSeconds] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0); 
 
+  const [unlockedPets, setUnlockedPets] = useState<string[]>(['elephant']);
+
   const getTodayStr = () => new Date().toISOString().split('T')[0];
   const getYesterdayStr = () => {
     const d = new Date();
@@ -186,6 +188,8 @@ export default function HomeScreen() {
         const data = snap.data();
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
+
+        setUnlockedPets(data.unlockedPets)
 
         if (data.selectedPetId){
           setSelectedPetId(data.selectedPetId)
@@ -353,7 +357,7 @@ export default function HomeScreen() {
   const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
 
   const renderPetOption = ({ item }: { item: any }) => {
-    const isUnlocked = item.id === 'elephant'; 
+    const isUnlocked = unlockedPets.includes(item.id)
     const isSelected = selectedPetId === item.id;
 
     return (

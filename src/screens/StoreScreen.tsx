@@ -5,7 +5,6 @@ import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
 import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 
 interface StoreItem {
   id: string;
@@ -37,7 +36,7 @@ const screenWidth = Dimensions.get('window').width;
 const cardWidth = (screenWidth - 60 - 15) / 2;
 
 export default function StoreScreen() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, themeName } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const USER_ID = auth.currentUser?.uid;
 
@@ -60,7 +59,6 @@ export default function StoreScreen() {
   const [unlockedPets, setUnlockedPets] = useState(['elephant']);
   const [currentPetId, setCurrentPetId] = useState('elephant');
   const [unlockedThemes, setUnlockedThemes] = useState(['default']);
-  const [currentTheme, setCurrentTheme] = useState('default');
 
   const displayData: StoreItem[] = activeTab === 'themes' ? mockThemes : animals;
 
@@ -120,7 +118,7 @@ export default function StoreScreen() {
   const renderActionButton = (item: StoreItem) => {
     const isAnimal = activeTab === 'animals';
     const isOwned = isAnimal ? unlockedPets.includes(item.id) : unlockedThemes.includes(item.id);
-    const isEquipped = isAnimal ? currentPetId === item.id : currentTheme === item.id;
+    const isEquipped = isAnimal ? currentPetId === item.id : themeName === item.id;
 
     if (isEquipped) {
       return (
