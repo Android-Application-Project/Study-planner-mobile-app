@@ -90,6 +90,12 @@ export default function RoomForIndependentStudy() {
   };
 
   useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
+
+  useEffect(() => {
     if (!roomId || !currentUserId) return;
     const roomRef = doc(db, 'rooms', roomId);
     const unsubRoom = onSnapshot(roomRef, (snap) => {
