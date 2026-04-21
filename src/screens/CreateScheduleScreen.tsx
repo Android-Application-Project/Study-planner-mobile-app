@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Modal,
@@ -22,7 +22,7 @@ import { Theme } from '../utils/Themes'
 import { auth, db } from '../../firebaseConfig'
 import { cancelScheduleNotificationsAsync, syncScheduleNotificationsAsync } from '../utils/Notifications'
 
-type TimePreference = 'Morning' | 'Afternoon' | 'Evening'
+type TimePreference = 'Morning' | 'Afternoon' | 'Evening' | 'Night'
 type SessionDensity = 1 | 2 | 3
 type Rating = 1 | 2 | 3 | 4 | 5
 
@@ -73,7 +73,7 @@ const DAY_OPTIONS: DayOption[] = [
 ]
 
 const RATING_OPTIONS: Rating[] = [1, 2, 3, 4, 5]
-const TIME_OPTIONS: TimePreference[] = ['Morning', 'Afternoon', 'Evening']
+const TIME_OPTIONS: TimePreference[] = ['Morning', 'Afternoon', 'Evening', 'Night']
 const SESSION_DENSITY_OPTIONS: SessionDensity[] = [1, 2, 3]
 
 const withOpacity = (hex: string, opacity: number) => {
@@ -97,6 +97,7 @@ const TIME_BASE_HOUR: Record<TimePreference, number> = {
   Morning: 8,
   Afternoon: 14,
   Evening: 19,
+  Night: 21,
 }
 
 const formatHour = (hour: number, minute = 0) =>
@@ -197,7 +198,11 @@ export default function CreateScheduleScreen() {
   const suggestedDeadline = useMemo(() => formatDate(suggestedDeadlineDate), [suggestedDeadlineDate])
 
   const [subjectName, setSubjectName] = useState('')
-  const [pomodoroMinutes, setPomodoroMinutes] = useState('50')
+  const [pomodoroMinutes, setPomodoroMinutes] = useState(50)
+  const [sliderWidth, setSliderWidth] = useState(0)
+  const sliderRef = useRef<View>(null)
+  const sliderPageXRef = useRef(0)
+  const sliderWidthRef = useRef(0)
   const [deadline, setDeadline] = useState(suggestedDeadline)
   const [deadlinePickerVisible, setDeadlinePickerVisible] = useState(false)
   const [difficulty, setDifficulty] = useState<Rating>(3)
@@ -206,6 +211,27 @@ export default function CreateScheduleScreen() {
   const [sessionDensity, setSessionDensity] = useState<SessionDensity>(2)
   const [timePreference, setTimePreference] = useState<TimePreference>('Evening')
   const [selectedDays, setSelectedDays] = useState<string[]>(['Mon', 'Wed', 'Fri'])
+
+  const pomodoroRatio = sliderWidth > 0
+    ? (pomodoroMinutes - 10) / (120 - 10)
+    : 0
+
+  const measureSlider = useCallback(() => {
+    sliderRef.current?.measureInWindow((pageX, _pageY, width) => {
+      sliderPageXRef.current = pageX
+      if (width > 0) sliderWidthRef.current = width
+    })
+  }, [])
+
+  const updatePomodoroFromPageX = useCallback((pageX: number) => {
+    const width = sliderWidthRef.current
+    if (width <= 0) return
+    const x = pageX - sliderPageXRef.current
+    const ratio = Math.max(0, Math.min(1, x / width))
+    const raw = 10 + ratio * (120 - 10)
+    const next = Math.max(10, Math.min(120, Math.round(raw / 5) * 5))
+    setPomodoroMinutes((prev) => (prev === next ? prev : next))
+  }, [])
 
   const toggleDay = (day: string) => {
     setSelectedDays((prev) =>
@@ -255,7 +281,7 @@ export default function CreateScheduleScreen() {
 
   const generateSchedule = async () => {
     const trimmedSubject = subjectName.trim()
-    const sessionMinutesInput = Number(pomodoroMinutes)
+    const sessionMinutesInput = pomodoroMinutes
     const parsedDeadline = parseDeadline(deadline)
 
     if (!trimmedSubject) {
@@ -263,8 +289,8 @@ export default function CreateScheduleScreen() {
       return
     }
 
-    if (!Number.isFinite(sessionMinutesInput) || sessionMinutesInput < 20) {
-      Alert.alert('Invalid pomodoro', 'Pomodoro session length should be at least 20 minutes.')
+    if (!Number.isFinite(sessionMinutesInput) || sessionMinutesInput < 10) {
+      Alert.alert('Invalid pomodoro', 'Pomodoro session length should be at least 10 minutes.')
       return
     }
 
@@ -440,15 +466,43 @@ export default function CreateScheduleScreen() {
             />
 
             <Text style={styles.label}>Pomodoro session length</Text>
-            <Text style={styles.helperText}>How long one focused study session should last, in minutes.</Text>
-            <TextInput
-              value={pomodoroMinutes}
-              onChangeText={setPomodoroMinutes}
-              placeholder="50"
-              placeholderTextColor={theme.colors.text2}
-              style={styles.input}
-              keyboardType="numeric"
-            />
+            <Text style={styles.helperText}>Slide to set how long one focused session should last.</Text>
+            <Text style={styles.sliderValueText}>{pomodoroMinutes} min</Text>
+            <View
+              ref={sliderRef}
+              style={styles.sliderTouchArea}
+              onLayout={(e) => {
+                const width = e.nativeEvent.layout.width
+                setSliderWidth(width)
+                sliderWidthRef.current = width
+                measureSlider()
+              }}
+              onStartShouldSetResponder={() => true}
+              onMoveShouldSetResponder={() => true}
+              onResponderTerminationRequest={() => false}
+              onResponderGrant={(evt) => {
+                const { pageX } = evt.nativeEvent
+                sliderRef.current?.measureInWindow((px, _py, width) => {
+                  sliderPageXRef.current = px
+                  if (width > 0) sliderWidthRef.current = width
+                  updatePomodoroFromPageX(pageX)
+                })
+              }}
+              onResponderMove={(evt) => updatePomodoroFromPageX(evt.nativeEvent.pageX)}
+            >
+              <View style={styles.sliderTrack} />
+              <View style={[styles.sliderFill, { width: pomodoroRatio * sliderWidth }]} />
+              <View
+                style={[
+                  styles.sliderThumb,
+                  { left: pomodoroRatio * sliderWidth - 14 },
+                ]}
+              />
+            </View>
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderLabelText}>10 min</Text>
+              <Text style={styles.sliderLabelText}>120 min</Text>
+            </View>
 
             <Text style={styles.label}>Deadline</Text>
             <Text style={styles.helperText}>
@@ -797,5 +851,60 @@ const createStyles = (theme: Theme) =>
       lineHeight: 22,
       marginBottom: 8,
       fontSize: 14,
+    },
+    sliderValueText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.primary,
+      textAlign: 'center',
+      marginBottom: 4,
+      fontVariant: ['tabular-nums'],
+    },
+    sliderTouchArea: {
+      height: 44,
+      justifyContent: 'center',
+    },
+    sliderTrack: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 19,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: withOpacity(theme.colors.card, theme.dark ? 0.42 : 0.55),
+    },
+    sliderFill: {
+      position: 'absolute',
+      left: 0,
+      top: 19,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.colors.primary,
+    },
+    sliderThumb: {
+      position: 'absolute',
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.colors.primary,
+      borderWidth: 3,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+      top: 8,
+    },
+    sliderLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 6,
+      marginBottom: 10,
+    },
+    sliderLabelText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.text2,
     },
   })
