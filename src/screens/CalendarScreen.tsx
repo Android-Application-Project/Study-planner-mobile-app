@@ -1,9 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { Calendar } from 'react-native-calendars'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
-import { useTheme } from '../utils/ThemeProvider'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { auth, db } from '../../firebaseConfig'
 import { syncScheduleNotificationsAsync } from '../utils/Notifications'
@@ -37,6 +48,7 @@ type Session = {
   completed?: boolean
   skipped?: boolean
   notificationId?: string | null
+  manuallyRescheduled?: boolean
 }
 
 type SubjectSchedule = {
@@ -67,6 +79,7 @@ type Task = {
   pomodoroMinutes: number
   difficulty: number
   importance: number
+  manuallyRescheduled: boolean
 }
 
 const formatDate = (date: Date) => {
@@ -74,6 +87,39 @@ const formatDate = (date: Date) => {
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
   const day = `${date.getDate()}`.padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+const formatTime = (date: Date) =>
+  `${date.getHours().toString().padStart(2, '0')}:${date
+    .getMinutes()
+    .toString()
+    .padStart(2, '0')}`
+
+const parseSessionDateTime = (dateStr: string, timeStr: string) => {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hour, minute] = timeStr.split(':').map(Number)
+  return new Date(year, month - 1, day, hour, minute, 0, 0)
+}
+
+const getDurationMinutes = (start: string, end: string) => {
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  const diff = eh * 60 + em - (sh * 60 + sm)
+  return diff > 0 ? diff : 25
+}
+
+const toMinutes = (time: string) => {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+const addMinutesToTime = (time: string, minutesToAdd: number) => {
+  const [hours, minutes] = time.split(':').map(Number)
+  const totalMinutes = hours * 60 + minutes + minutesToAdd
+  const safe = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60)
+  const hh = Math.floor(safe / 60)
+  const mm = safe % 60
+  return `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`
 }
 
 const todayString = () => formatDate(new Date())
@@ -85,6 +131,13 @@ export default function CalendarScreen() {
   const [selected, setSelected] = useState(formatDate(new Date()))
   const [tasks, setTasks] = useState<Task[]>([])
   const [schedules, setSchedules] = useState<SubjectSchedule[]>([])
+
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editDate, setEditDate] = useState<Date>(new Date())
+  const [editTime, setEditTime] = useState<Date>(new Date())
+  const [showAndroidDatePicker, setShowAndroidDatePicker] = useState(false)
+  const [showAndroidTimePicker, setShowAndroidTimePicker] = useState(false)
+  const [savingReschedule, setSavingReschedule] = useState(false)
 
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
@@ -141,6 +194,7 @@ export default function CalendarScreen() {
             pomodoroMinutes: schedule.pomodoroMinutes ?? 0,
             difficulty: schedule.difficulty ?? 0,
             importance: schedule.importance ?? 0,
+            manuallyRescheduled: !!item.manuallyRescheduled,
           })),
         )
         .filter((item) => item.date && item.start && item.end && item.title)
@@ -224,6 +278,87 @@ export default function CalendarScreen() {
     }
   }
 
+  const openReschedule = (task: Task) => {
+    const initial = parseSessionDateTime(task.date, task.start)
+    setEditingTask(task)
+    setEditDate(initial)
+    setEditTime(initial)
+    setShowAndroidDatePicker(false)
+    setShowAndroidTimePicker(false)
+  }
+
+  const closeReschedule = () => {
+    if (savingReschedule) return
+    setEditingTask(null)
+    setShowAndroidDatePicker(false)
+    setShowAndroidTimePicker(false)
+  }
+
+  const handleSaveReschedule = async () => {
+    if (!editingTask) return
+
+    const newDate = formatDate(editDate)
+    const newStart = formatTime(editTime)
+    const duration = getDurationMinutes(editingTask.start, editingTask.end)
+    const newEnd = addMinutesToTime(newStart, duration)
+
+    const newStartMin = toMinutes(newStart)
+    const newEndMin = toMinutes(newEnd)
+
+    const conflictingTask = tasks.find((other) => {
+      if (other.id === editingTask.id) return false
+      if (other.date !== newDate) return false
+      if (other.completed || other.skipped) return false
+      const otherStart = toMinutes(other.start)
+      const otherEnd = toMinutes(other.end)
+      return newStartMin < otherEnd && otherStart < newEndMin
+    })
+
+    if (conflictingTask) {
+      Alert.alert(
+        'Time conflict',
+        `This slot overlaps with "${conflictingTask.title}" on ${conflictingTask.date} (${conflictingTask.time}). Please pick a different date or start time.`,
+      )
+      return
+    }
+
+    const nextSchedules = schedules.map((schedule) =>
+      schedule.id !== editingTask.subjectId
+        ? schedule
+        : {
+            ...schedule,
+            sessions: schedule.sessions.map((session) =>
+              getSessionKey(schedule.id, session) === editingTask.id
+                ? {
+                    ...session,
+                    date: newDate,
+                    start: newStart,
+                    end: newEnd,
+                    manuallyRescheduled: true,
+                  }
+                : session,
+            ),
+          },
+    )
+
+    try {
+      setSavingReschedule(true)
+      const targetSchedule = nextSchedules.find((schedule) => schedule.id === editingTask.subjectId)
+      const syncedSchedule = targetSchedule ? await syncScheduleNotificationsAsync(targetSchedule) : null
+      const finalSchedules = nextSchedules.map((schedule) =>
+        schedule.id === syncedSchedule?.id ? syncedSchedule : schedule,
+      )
+      await persistSchedules(finalSchedules)
+      setSelected(newDate)
+      setEditingTask(null)
+    } catch (error) {
+      console.error('Error rescheduling:', error)
+      Alert.alert('Update failed', 'Could not move this session right now.')
+    } finally {
+      setSavingReschedule(false)
+    }
+  }
+
   const tasksForSelectedDay = useMemo(
     () => tasks.filter((item) => item.date === selected),
     [selected, tasks],
@@ -272,7 +407,15 @@ export default function CalendarScreen() {
       />
 
       <View style={styles.taskContent}>
-        <Text style={styles.taskTime}>{item.time}</Text>
+        <View style={styles.taskHeaderRow}>
+          <Text style={styles.taskTime}>{item.time}</Text>
+          {item.manuallyRescheduled && (
+            <View style={styles.movedBadge}>
+              <Ionicons name="swap-horizontal" size={12} color="#FFFFFF" />
+              <Text style={styles.movedBadgeText}>Moved</Text>
+            </View>
+          )}
+        </View>
         <Text
           style={[
             styles.taskTitle,
@@ -321,6 +464,14 @@ export default function CalendarScreen() {
             <Text style={[styles.skipText, item.skipped && styles.skipTextActive]}>
               {item.skipped ? 'Skipped' : 'Skip'}
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.rescheduleButton]}
+            onPress={() => openReschedule(item)}
+          >
+            <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
+            <Text style={styles.rescheduleText}>Reschedule</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -372,6 +523,115 @@ export default function CalendarScreen() {
           }
         />
       </View>
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={!!editingTask}
+        onRequestClose={closeReschedule}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeReschedule}>
+          <Pressable style={styles.rescheduleCard} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.rescheduleModalTitle}>Reschedule session</Text>
+            <Text style={styles.rescheduleModalSubtitle}>
+              {editingTask
+                ? `Pick another date and start time for "${editingTask.title}". The session length stays the same.`
+                : ''}
+            </Text>
+
+            {Platform.OS === 'ios' ? (
+              <>
+                <Text style={styles.fieldLabel}>New date</Text>
+                <View style={styles.pickerFrame}>
+                  <DateTimePicker
+                    value={editDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={(_, d) => d && setEditDate(d)}
+                    textColor={theme.colors.text1}
+                    accentColor={theme.colors.primary}
+                    style={styles.iosPicker}
+                  />
+                </View>
+
+                <Text style={styles.fieldLabel}>New start time</Text>
+                <View style={styles.pickerFrame}>
+                  <DateTimePicker
+                    value={editTime}
+                    mode="time"
+                    display="spinner"
+                    onChange={(_, d) => d && setEditTime(d)}
+                    textColor={theme.colors.text1}
+                    accentColor={theme.colors.primary}
+                    style={styles.iosPicker}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.selectorButton}
+                  onPress={() => setShowAndroidDatePicker(true)}
+                >
+                  <View>
+                    <Text style={styles.selectorLabel}>New date</Text>
+                    <Text style={styles.selectorValue}>{formatDate(editDate)}</Text>
+                  </View>
+                  <Text style={styles.selectorHint}>Change</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.selectorButton}
+                  onPress={() => setShowAndroidTimePicker(true)}
+                >
+                  <View>
+                    <Text style={styles.selectorLabel}>New start time</Text>
+                    <Text style={styles.selectorValue}>{formatTime(editTime)}</Text>
+                  </View>
+                  <Text style={styles.selectorHint}>Change</Text>
+                </TouchableOpacity>
+
+                {showAndroidDatePicker && (
+                  <DateTimePicker
+                    value={editDate}
+                    mode="date"
+                    onChange={(_, d) => {
+                      setShowAndroidDatePicker(false)
+                      if (d) setEditDate(d)
+                    }}
+                  />
+                )}
+                {showAndroidTimePicker && (
+                  <DateTimePicker
+                    value={editTime}
+                    mode="time"
+                    is24Hour
+                    onChange={(_, d) => {
+                      setShowAndroidTimePicker(false)
+                      if (d) setEditTime(d)
+                    }}
+                  />
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.saveButton, savingReschedule && styles.saveButtonDisabled]}
+              onPress={handleSaveReschedule}
+              disabled={savingReschedule}
+            >
+              <Text style={styles.saveButtonText}>
+                {savingReschedule ? 'Saving…' : 'Save new time'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelButton} onPress={closeReschedule}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }
@@ -521,5 +781,145 @@ const createStyles = (theme: Theme) =>
       color: theme.colors.text2,
       textAlign: 'center',
       lineHeight: 21,
+    },
+    taskHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    movedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: theme.colors.primary,
+    },
+    movedBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.3,
+    },
+    rescheduleButton: {
+      backgroundColor: withOpacity(theme.colors.primary, theme.dark ? 0.18 : 0.12),
+    },
+    rescheduleText: {
+      marginLeft: 6,
+      color: theme.colors.primary,
+      fontWeight: '800',
+      fontSize: 13,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: withOpacity(theme.colors.secondary1, theme.dark ? 0.72 : 0.32),
+      justifyContent: 'flex-end',
+    },
+    rescheduleCard: {
+      backgroundColor: withOpacity(theme.colors.background, theme.dark ? 0.95 : 0.98),
+      borderTopLeftRadius: 30,
+      borderTopRightRadius: 30,
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 24,
+    },
+    modalHandle: {
+      width: 52,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.text2, theme.dark ? 0.48 : 0.28),
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    rescheduleModalTitle: {
+      color: theme.colors.text1,
+      fontSize: 20,
+      fontWeight: '800',
+      marginBottom: 6,
+    },
+    rescheduleModalSubtitle: {
+      color: theme.colors.text2,
+      fontSize: 13,
+      fontWeight: '600',
+      lineHeight: 20,
+      marginBottom: 14,
+    },
+    fieldLabel: {
+      color: theme.colors.text1,
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 8,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+    },
+    pickerFrame: {
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.background, theme.dark ? 0.2 : 0.95),
+      overflow: 'hidden',
+      marginBottom: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iosPicker: {
+      alignSelf: 'stretch',
+      height: 160,
+    },
+    selectorButton: {
+      borderRadius: 16,
+      backgroundColor: withOpacity(theme.colors.background, theme.dark ? 0.28 : 0.92),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text2, theme.dark ? 0.45 : 0.2),
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    selectorLabel: {
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: '700',
+      marginBottom: 2,
+      textTransform: 'uppercase',
+      letterSpacing: 0.9,
+    },
+    selectorValue: {
+      color: theme.colors.text1,
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    selectorHint: {
+      color: theme.colors.primary,
+      fontWeight: '800',
+      fontSize: 13,
+    },
+    saveButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: 18,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    saveButtonDisabled: {
+      opacity: 0.6,
+    },
+    saveButtonText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    cancelButton: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    cancelButtonText: {
+      color: theme.colors.text2,
+      fontSize: 14,
+      fontWeight: '700',
     },
   })

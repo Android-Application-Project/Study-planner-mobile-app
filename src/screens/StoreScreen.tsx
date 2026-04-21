@@ -1,37 +1,11 @@
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, Dimensions, Alert, Image } from 'react-native'
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, Dimensions } from 'react-native'
 import React, { useMemo, useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore'
-import { db, auth } from '../../firebaseConfig'
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-
-interface StoreItem {
-  id: string;
-  name: string;
-  price: number;
-  color?: string; 
-}
-
-const mockThemes: StoreItem[] = [
-  { id: 'default', name: 'Default', price: 0, color: '#84A98C' },
-  { id: 'blue', name: 'Ocean Blue', price: 150, color: '#64B5F6' },
-  { id: 'purple', name: 'Royal Purple', price: 200, color: '#BA68C8' },
-  { id: 'darkBlue', name: 'Dark Mode', price: 300, color: '#2F3E46' },
-];
-
-const animals: StoreItem[] = [
-  { id: 'elephant', name: 'Elephant', price: 0 },
-  { id: 'crocodile', name: 'Crocodile', price: 300 },
-  { id: 'shark', name: 'Shark', price: 500 },
-];
-
-const ANIMAL_IMAGES = {
-  elephant: require('../assets/Animal/AdultElephant.png'),
-  crocodile: require('../assets/Animal/AdultCrocodile.png'),
-  shark: require('../assets/Animal/AdultShark.png'),
-};
+import { auth } from '../../firebaseConfig';
+import { doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../../firebaseConfig';
 
 const screenWidth = Dimensions.get('window').width;
 const cardWidth = (screenWidth - 60 - 15) / 2;
@@ -39,123 +13,127 @@ const cardWidth = (screenWidth - 60 - 15) / 2;
 export default function StoreScreen() {
   const { theme, setTheme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const USER_ID = auth.currentUser?.uid;
 
-  // --- 狀態控制 ---
+  const uid = auth.currentUser?.uid;
+  if (!uid) return
+
   const [activeTab, setActiveTab] = useState<'themes' | 'animals'>('themes');
   const [coins, setCoins] = useState(0);
-  const [unlockedPets, setUnlockedPets] = useState(['elephant']);
-  const [currentPetId, setCurrentPetId] = useState('elephant');
-  const [unlockedThemes, setUnlockedThemes] = useState(['default']);
-  const [currentTheme, setCurrentTheme] = useState('default');
-
-  const displayData: StoreItem[] = activeTab === 'themes' ? mockThemes : animals;
 
   useEffect(() => {
-    if (!USER_ID) return;
-    const unsub = onSnapshot(doc(db, 'users', USER_ID), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setCoins(data.coins || 0);
-        setUnlockedPets(data.unlockedPets || ['elephant']);
-        setCurrentPetId(data.selectedPetId || 'elephant');
-        setUnlockedThemes(data.unlockedThemes || ['default']);
-        // 這裡可以根據你 ThemeProvider 的實作來同步 currentTheme
+    const unsubscribe = onSnapshot(doc(db, 'users', uid), (docSnap) => {
+      if(docSnap.exists()) {
+        setCoins(docSnap.data().coins || 0)
       }
-    });
-    return () => unsub();
-  }, [USER_ID]);
+    })
 
-  const handleAction = async (item: StoreItem) => {
-    const isAnimal = activeTab === 'animals';
-    const isOwned = isAnimal ? unlockedPets.includes(item.id) : unlockedThemes.includes(item.id);
+    return () => unsubscribe()
+  }, [])
 
-    if (isOwned) {
-      if (!USER_ID) return;
-      const userRef = doc(db, 'users', USER_ID);
-      if (isAnimal) {
-        await updateDoc(userRef, { selectedPetId: item.id });
-      } else {
-        setTheme(item.id as any);
-        await updateDoc(userRef, { currentThemeId: item.id });
+  const [mockThemes, setMockThemes] = useState([
+    { id: 't1', name: 'Default', price: 0, color: '#84A98C', status: 'equipped' },
+    { id: 't2', name: 'Ocean Blue', price: 150, color: '#64B5F6', status: 'owned' },
+    { id: 't3', name: 'Royal Purple', price: 200, color: '#BA68C8', status: 'buyable' },
+    { id: 't4', name: 'Dark Mode', price: 300, color: '#2F3E46', status: 'buyable' },
+  ]);
+
+  const mockAnimals = [
+    { id: 'a1', name: 'Alex', icon: '🐱', price: 0, status: 'equipped' },
+    { id: 'a2', name: 'Rex', icon: '🦊', price: 300, status: 'buyable' },
+    { id: 'a3', name: 'Peppa', icon: '🐷', price: 400, status: 'buyable' },
+    { id: 'a4', name: 'Kermit', icon: '🐸', price: 250, status: 'buyable' },
+  ];
+
+  const handleTheme = (item: any) => {
+    if (item.status === 'owned') {
+      let newTheme: 'blue' | 'purple' | 'darkBlue' | 'default' = 'default'
+      switch (item.id) {
+        case 't1': newTheme = 'default'; break
+        case 't2': newTheme = 'blue'; break
+        case 't3': newTheme = 'purple'; break
+        case 't4': newTheme = 'darkBlue'; break
       }
-      Alert.alert("Success", `${item.name} equipped!`);
-    } else {
-      if (coins < item.price) {
-        Alert.alert("Error", "Not enough 🐟 coins!");
-        return;
-      }
+      setTheme(newTheme)
 
-      Alert.alert("Confirm Purchase", `Buy ${item.name} for 🐟 ${item.price}?`, [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Buy", 
-          onPress: async () => {
-            if (!USER_ID) return;
-            const userRef = doc(db, 'users', USER_ID);
-            const updateField = isAnimal ? { unlockedPets: arrayUnion(item.id) } : { unlockedThemes: arrayUnion(item.id) };
-            await updateDoc(userRef, {
-              coins: coins - item.price,
-              ...updateField
-            });
-          }
-        }
-      ]);
+      setMockThemes(prev =>
+        prev.map(themeItem => ({
+          ...themeItem,
+          status: themeItem.id === item.id 
+            ? 'equipped' 
+            : themeItem.status === 'equipped' 
+            ? 'owned' 
+            : themeItem.status
+        }))
+      )
     }
-  };
+  }
 
-  const renderActionButton = (item: StoreItem) => {
-    const isAnimal = activeTab === 'animals';
-    const isOwned = isAnimal ? unlockedPets.includes(item.id) : unlockedThemes.includes(item.id);
-    const isEquipped = isAnimal ? currentPetId === item.id : currentTheme === item.id;
+  const handleBuyTheme = (item: any) => {
+    if (coins >= item.price) {
+      setCoins(prev => prev - item.price);
+      setMockThemes(prev =>
+        prev.map(themeItem => ({
+          ...themeItem,
+          status: themeItem.id === item.id 
+            ? 'owned' 
+            : themeItem.status === 'equipped' 
+            ? 'equipped' 
+            : themeItem.status
+        }))
+      )
+    }
+  }
 
-    if (isEquipped) {
+  const renderActionButton = (item: any) => {
+    if (item.status === 'equipped') {
       return (
-        <View style={[styles.actionButton, styles.buttonEquipped]}>
-          <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Equipped</Text>
-        </View>
+        <TouchableOpacity style={[styles.actionButton, styles.buttonEquipped]}>
+          <Text style={[styles.actionButtonText, { color: theme.colors.text1 }]}>Equipped</Text>
+        </TouchableOpacity>
+      );
+    } else if (item.status === 'owned') {
+      return (
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.buttonOwned]}
+          onPress={() => handleTheme(item)}
+        >
+          <Text style={[styles.actionButtonText, { color: theme.colors.text1 }]}>Use</Text>
+        </TouchableOpacity>
+      );
+    } else {
+      return (
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.buttonBuy]} 
+          onPress={() => handleBuyTheme(item)}
+        >
+          <Text style={styles.actionButtonText}>🐟 {item.price}</Text>
+        </TouchableOpacity>
       );
     }
-
-    return (
-      <TouchableOpacity 
-        style={[styles.actionButton, isOwned ? styles.buttonOwned : styles.buttonBuy]} 
-        onPress={() => handleAction(item)}
-      >
-        <Text style={[styles.actionButtonText, isOwned && { color: theme.colors.text1 }]}>
-          {isOwned ? "Use" : `🐟 ${item.price}`}
-        </Text>
-      </TouchableOpacity>
-    );
   };
 
-  const renderItem = ({ item }: { item: StoreItem }) => {
+  const renderItem = ({ item }: any) => {
     const isTheme = activeTab === 'themes';
     
     return (
-      <View style={styles.cardContainer}>
+      <TouchableOpacity style={styles.cardContainer} activeOpacity={0.9}>
         {isTheme ? (
           <View style={[styles.previewArea, { backgroundColor: item.color }]} />
         ) : (
           <View style={[styles.previewArea, styles.animalPreviewBg]}>
-            <Image 
-              source={ANIMAL_IMAGES[item.id as keyof typeof ANIMAL_IMAGES]} 
-              style={{ width: 80, height: 80 }} 
-              resizeMode="contain" 
-            />
+            <Text style={styles.animalIcon}>{item.icon}</Text>
           </View>
         )}
         <View style={styles.cardInfo}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           {renderActionButton(item)}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Store</Text>
         <View style={styles.coinBadge}>
@@ -163,7 +141,6 @@ export default function StoreScreen() {
         </View>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
           style={[styles.tabButton, activeTab === 'themes' && styles.activeTab]}
@@ -181,8 +158,7 @@ export default function StoreScreen() {
       </View>
 
       <FlatList
-        key={activeTab} 
-        data={displayData}
+        data={(activeTab === 'themes' ? mockThemes : mockAnimals) as any[]}
         keyExtractor={item => item.id}
         renderItem={renderItem}
         numColumns={2}
@@ -190,10 +166,10 @@ export default function StoreScreen() {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
       />
+
     </SafeAreaView>
   )
 }
-
 
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {

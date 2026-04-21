@@ -1,16 +1,14 @@
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native'
 import { useState, useMemo } from 'react'
 import { Theme } from '../utils/Themes'
-import { useTheme } from '../utils/ThemeProvider'
+import { useTheme } from '../utils/ThemeContext'
 import { db, auth } from '../../firebaseConfig'
 import { doc, setDoc } from 'firebase/firestore'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import Feather from '@expo/vector-icons/Feather';
-import { signInWithGoogle, googleAuthConfig } from '../utils/GoogleAuth'
-import * as Google from 'expo-auth-session/providers/google'
 
-export default function registerScreen({ navigation, setIsLoggedIn }: { navigation: any, setIsLoggedIn: (value: boolean) => void }) {
+export default function registerScreen({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
@@ -18,24 +16,6 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
   const [error, setError] = useState('')
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: googleAuthConfig.webClientId,
-    iosClientId: googleAuthConfig.iosClientId,
-    scopes: ['profile', 'email']
-  })
-
-  const handleGoogle = async () => {
-    try {
-      setError('')
-      const result = await signInWithGoogle(promptAsync)
-      if (result) setIsLoggedIn(true)
-    } catch (err) {
-      console.log('Error handleGoogle: ', err)
-      setError('Google sign-in failed')
-      setIsLoggedIn(false)
-    }
-  }
 
   async function handleRegister() {
     try {
@@ -45,10 +25,10 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         username: username,
         email: email,
+        coins: 0,
+        completedMinutes: 0,
         createdAt: new Date()
       })
-
-      setIsLoggedIn(true)
 
     } catch(err) {
       const error = err as FirebaseError
@@ -62,8 +42,6 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
       } else {
         setError(error.message)
       }
-
-      setIsLoggedIn(false)
     }
   }
 
@@ -121,18 +99,6 @@ export default function registerScreen({ navigation, setIsLoggedIn }: { navigati
         <Text style={styles.orText}>or</Text>
         <View style={styles.orLine} />
       </View>
-
-      <TouchableOpacity
-        style={styles.button}
-        disabled={!request}
-        onPress={handleGoogle}
-      >
-        <Image
-          style={styles.icon}
-          source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-        />
-        <Text style={styles.text}>Sign in with Google</Text>
-      </TouchableOpacity>
 
       <View style={styles.signupContainer}>
         <Text style={styles.signupText}>Already have an account?</Text>

@@ -10,7 +10,7 @@ import { Audio } from 'expo-av';
 import Svg, { Circle, G } from 'react-native-svg';
 import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'; 
 
 const { width } = Dimensions.get('window');

@@ -1,8 +1,8 @@
 import { StyleSheet, Text, TouchableOpacity, View, FlatList, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Image } from 'react-native'
 import React, { useMemo, useState, useEffect } from 'react'
-import { useTheme } from '../utils/ThemeProvider';
+import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
-import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 
 import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove, setDoc } from 'firebase/firestore';
