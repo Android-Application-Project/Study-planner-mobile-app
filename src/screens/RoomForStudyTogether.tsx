@@ -81,13 +81,13 @@ export default function RoomForStudyTogether() {
   const { roomId, roomName } = route.params || {};
   const currentUserId = auth.currentUser?.uid;
 
-  const [elapsedSeconds, setElapsedSeconds] = useState(0); 
 
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [roomMessages, setRoomMessages] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [focusMinutes, setFocusMinutes] = useState(25);
   const [timeLeft, setTimeLeft] = useState(25 * 60); 
+  const [hasCollected, setHasCollected] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState('elephant');
   const [showCryingPet, setShowCryingPet] = useState(false);
@@ -101,7 +101,6 @@ export default function RoomForStudyTogether() {
   const [isChatModalVisible, setChatModalVisible] = useState(false);
   const [isInviteModalVisible, setInviteModalVisible] = useState(false);
   const [isSoundModalVisible, setSoundModalVisible] = useState(false);
-  const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
 
   const soundObject = useRef<Audio.Sound | null>(null);
   const timerViewRef = useRef<View>(null);
@@ -238,85 +237,72 @@ export default function RoomForStudyTogether() {
     } catch (e) { console.log(e); }
   };
 
-  const syncMyStatus = async () => {
-      if (!currentUserId || !roomId) return;
-      const roomRef = doc(db, 'rooms', roomId);
-      
-      try {
-        const roomSnap = await getDoc(roomRef);
-        if (roomSnap.exists()) {
-          const data = roomSnap.data();
-          const users = data.activeUsers || [];
-          
-          const updatedUsers = users.map((u: any) => 
-            u.id === currentUserId 
-              ? { 
-                  ...u, 
-                  status: isActive ? (currentMode === 'Relax' ? 'Resting' : 'Focusing') : 'Pause',
-                  timeLeft: timeLeft 
-                } 
-              : u
-          );
-
-          await updateDoc(roomRef, { activeUsers: updatedUsers });
-        }
-      } catch (e) {
-        console.log("Sync status error:", e);
-      }
-    };
-
-  useEffect(() => { syncMyStatus(); }, [isActive, currentMode, timeLeft]);
-
   useEffect(() => {
     let iv: any = null;
+    
     if (isHost && isActive && timeLeft > 0) {
       iv = setInterval(() => {
         const nextValue = timeLeft - 1;
         setTimeLeft(nextValue);
         updateDoc(doc(db, 'rooms', roomId), { timeLeft: nextValue });
-
-        if (currentMode === 'Study') { 
-          setElapsedSeconds(prev => prev + 1);
-        }
       }, 1000);
+      
+      if (hasCollected) setHasCollected(false);
     } 
-    
-    else if (!isHost && isActive && timeLeft > 0) {
-      iv = setInterval(() => {
-        if (currentMode === 'Study') { 
-          setElapsedSeconds(prev => prev + 1);
-        }
-      }, 1000);
-    }
 
-    if (isActive && timeLeft === 0) {
+    if (isActive && timeLeft === 0 && !hasCollected) {
       setIsActive(false);
+      setHasCollected(true);
 
       if (currentMode === 'Study') {
-        const earnedCoins = Math.floor(elapsedSeconds / 60);
-        playNotificationSound('complete');
+        (async () => {
+          try {
+            const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+            if (roomSnap.exists()) {
+              const roomData = roomSnap.data();
+              const startTime = roomData.sessionStartedAt;
 
-        if (earnedCoins > 0) {
-          const userRef = doc(db, 'users', currentUserId!);
-          updateDoc(userRef, { coins: increment(earnedCoins) });
-          Alert.alert("Goal Reached!", `You earned 🐟 ${earnedCoins} coins!`);
-        } else {
-          Alert.alert("Goal Reached!", "Good job!");
-        }
-        setElapsedSeconds(0);
+              if (startTime) {
+                // 公式：(現在結束時間 - 雲端開始時間) / 1000 = 真正的專注秒數
+                const totalDiffSeconds = Math.floor((Date.now() - startTime) / 1000);
+                
+                // 強制對齊：如果誤差在 10 秒內，補足到 focusMinutes (避免網路延遲少給 1 幣)
+                const targetSeconds = focusMinutes * 60;
+                const finalSeconds = (targetSeconds - totalDiffSeconds < 10) ? targetSeconds : totalDiffSeconds;
+                
+                const earnedCoins = Math.floor(finalSeconds / 60);
+
+                if (earnedCoins > 0) {
+                  const userRef = doc(db, 'users', currentUserId!); 
+                  await updateDoc(userRef, { coins: increment(earnedCoins) });
+                  playNotificationSound('complete');
+                  Alert.alert("Goal Reached!", `You earned 🐟 ${earnedCoins} coins!`);
+                }
+              }
+            }
+          } catch (e) {
+            console.log("領取金幣出錯:", e);
+          }
+        })();
       } else {
         playNotificationSound('breakEnd');
-        Alert.alert("Break Over!", "Ready to focus?");
-        if (isHost) setCurrentMode('Study');
+        if (isHost) updateDoc(doc(db, 'rooms', roomId), { currentMode: 'Study' });
       }
 
       if (isHost) {
-        updateDoc(doc(db, 'rooms', roomId), { isActive: false, timeLeft: focusMinutes * 60 });
+        setTimeout(() => {
+          updateDoc(doc(db, 'rooms', roomId), { 
+            isActive: false, 
+            timeLeft: focusMinutes * 60 
+          });
+        }, 2000); 
       }
     }
 
-    return () => clearInterval(iv);
-  }, [isActive, timeLeft, currentMode, isHost]);
+    return () => {
+      if (iv) clearInterval(iv);
+    };
+  }, [isActive, timeLeft, currentMode, isHost, hasCollected]);
 
   const getCurrentPetImage = () => {
     const pet = (PETS_DATA as any)[selectedPetId] || PETS_DATA.elephant;

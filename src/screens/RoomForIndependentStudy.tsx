@@ -274,11 +274,10 @@ export default function RoomForIndependentStudy() {
           Alert.alert("Goal Reached!", "Good job, but focus longer next time to earn coins!");
         }
         
-        setElapsedSeconds(0); // 結算完重置
+        setElapsedSeconds(0); 
       } else {
         playNotificationSound('breakEnd');
 
-        Alert.alert("Break Over!", "Ready to focus again?");
         setCurrentMode('Study');
       }
       setTimeLeft(focusMinutes * 60);

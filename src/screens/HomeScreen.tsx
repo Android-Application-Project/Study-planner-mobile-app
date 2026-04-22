@@ -272,7 +272,6 @@ export default function HomeScreen() {
         Alert.alert("Mission Complete!", "You finished your session!");
       } else {
         playNotificationSound('breakEnd');
-        Alert.alert("Break Over!", "Ready to focus again?");
         setCurrentMode('Study'); 
       }
       
