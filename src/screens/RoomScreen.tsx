@@ -405,7 +405,14 @@ export default function RoomScreen() {
           <Feather name = 'mail' size = {20} color = {theme.colors.primary} style = {{ marginRight: 10}} />
           <View style = {{ flex: 1 }}>
             <Text style = {styles.notifText}>
-              <Text style={{ fontWeight: 'bold' }}>{item.senderName}</Text> invited you to join <Text style={{ fontWeight: 'bold' }}>{item.roomName}</Text>!
+              <Text 
+                style={
+                  { 
+                    fontWeight: 'bold' 
+                  }
+                }>{
+                  item.senderName}
+              </Text> invited you to join <Text style={{ fontWeight: 'bold' }}>{item.roomName}</Text>!
             </Text>
           </View>
         </View>
@@ -695,19 +702,87 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.text1 
   },
 
-  headerRightActions: { flexDirection: 'row', alignItems: 'center' },
-  bellButton: { position: 'relative', marginRight: 18, padding: 5 },
-  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: '#EF4444', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.background },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
-  notifModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  notifCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
-  notifInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  notifText: { fontSize: 15, color: theme.colors.text1, lineHeight: 22 },
-  notifActions: { flexDirection: 'row', justifyContent: 'flex-end' },
-  declineBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15, backgroundColor: '#F3F4F6', marginRight: 10 },
-  declineBtnText: { color: theme.colors.text2, fontWeight: 'bold', fontSize: 13 },
-  acceptBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15, backgroundColor: theme.colors.primary },
-  acceptBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  headerRightActions: { 
+      flexDirection: 'row', 
+      alignItems: 'center' 
+    },
+  bellButton: { 
+    position: 'relative', 
+    marginRight: 18, 
+    padding: 5 
+  },
+  badge: { 
+    position: 'absolute', 
+    top: 0, 
+    right: 0, 
+    backgroundColor: '#EF4444', 
+    width: 18, 
+    height: 18, 
+    borderRadius: 9, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 2, 
+    borderColor: theme.colors.background 
+  },
+  badgeText: { 
+    color: '#FFF', 
+    fontSize: 10, 
+    fontWeight: 'bold' 
+  },
+  notifModalHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  notifCard: { 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 12, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 5, 
+    elevation: 2 
+  },
+  notifInfo: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 12 
+  },
+  notifText: { 
+    fontSize: 15, 
+    color: theme.colors.text1, 
+    lineHeight: 22 
+  },
+  notifActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end' 
+  },
+  declineBtn: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 15, 
+    borderRadius: 15, 
+    backgroundColor: '#F3F4F6', 
+    marginRight: 10 
+  },
+  declineBtnText: { 
+    color: theme.colors.text2, 
+    fontWeight: 'bold', 
+    fontSize: 13 
+  },
+  acceptBtn: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 15, 
+    borderRadius: 15, 
+    backgroundColor: theme.colors.primary 
+  },
+  acceptBtnText: { 
+    color: '#FFF', 
+    fontWeight: 'bold', 
+    fontSize: 13 
+  },
 
   createButton: { 
     flexDirection: 'row', 
