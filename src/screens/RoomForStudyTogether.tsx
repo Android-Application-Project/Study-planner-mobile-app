@@ -263,10 +263,7 @@ export default function RoomForStudyTogether() {
               const startTime = roomData.sessionStartedAt;
 
               if (startTime) {
-                // 公式：(現在結束時間 - 雲端開始時間) / 1000 = 真正的專注秒數
                 const totalDiffSeconds = Math.floor((Date.now() - startTime) / 1000);
-                
-                // 強制對齊：如果誤差在 10 秒內，補足到 focusMinutes (避免網路延遲少給 1 幣)
                 const targetSeconds = focusMinutes * 60;
                 const finalSeconds = (targetSeconds - totalDiffSeconds < 10) ? targetSeconds : totalDiffSeconds;
                 
@@ -323,6 +320,19 @@ export default function RoomForStudyTogether() {
   const rad = (((focusMinutes / MAX_MINUTES) * 360) - 90) * (Math.PI / 180);
   const handleX = CIRCLE_RADIUS + RING_CENTER_R * Math.cos(rad);
   const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
+
+  const resetFocusSession = async () => {
+    setIsActive(false);
+    const resetTime = focusMinutes * 60;
+    setTimeLeft(resetTime);
+    setShowCryingPet(true); 
+    setTimeout(() => setShowCryingPet(false), 4000); 
+    
+    await updateDoc(doc(db, 'rooms', roomId), { 
+      isActive: false, 
+      timeLeft: resetTime 
+    });
+  };
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => !isActive && isHost,
@@ -381,21 +391,20 @@ export default function RoomForStudyTogether() {
             <TouchableOpacity 
               style={[styles.modeTab, currentMode === 'Study' && styles.activeModeTab]}
               onPress={() => {
-                if (!isHost) {
-                  Alert.alert("Notice", "Only the host can switch modes.");
-                  return;
-                }
+                if (!isHost) { Alert.alert("Notice", "Only the host can switch modes."); return; }
                 
-                const newSeconds = focusMinutes * 60;
-                setCurrentMode('Study');
-                setIsActive(false);
-                setTimeLeft(newSeconds);
-
-                updateDoc(doc(db, 'rooms', roomId), { 
-                  currentMode: 'Study', 
-                  isActive: false, 
-                  timeLeft: newSeconds 
-                });
+                if (currentMode === 'Study' && isActive) {
+                  Alert.alert("Reset Focus?", "Switching now will clear progress for everyone and you won't get any coins!", [
+                    { text: "Keep Focusing", style: "cancel" },
+                    { text: "Reset Anyway", style: 'destructive', onPress: resetFocusSession }
+                  ]);
+                } else {
+                  const newSeconds = focusMinutes * 60;
+                  setCurrentMode('Study');
+                  setIsActive(false);
+                  setTimeLeft(newSeconds);
+                  updateDoc(doc(db, 'rooms', roomId), { currentMode: 'Study', isActive: false, timeLeft: newSeconds });
+                }
               }}
             >
               <MaterialCommunityIcons 
@@ -409,11 +418,16 @@ export default function RoomForStudyTogether() {
             <TouchableOpacity 
               style={[styles.modeTab, currentMode === 'Relax' && styles.activeModeTab]}
               onPress={() => {
-                if (!isHost) {
-                  Alert.alert("Notice", "Only the host can switch modes.");
-                  return;
+                if (!isHost) { Alert.alert("Notice", "Only the host can switch modes."); return; }
+
+                if (currentMode === 'Study' && isActive) {
+                  Alert.alert("Switch to Relax?", "Switching now will reset focus progress and you won't get any coins!", [
+                    { text: "Keep Focusing", style: "cancel" },
+                    { text: "Switch Anyway", style: 'destructive', onPress: () => setRelaxModalVisible(true) }
+                  ]);
+                } else {
+                  setRelaxModalVisible(true);
                 }
-                setRelaxModalVisible(true);
               }}
             >
               <MaterialCommunityIcons 
@@ -429,9 +443,21 @@ export default function RoomForStudyTogether() {
             style={[styles.playButton, !isHost && { backgroundColor: '#CCC' }]} 
             onPress={() => {
               if (!isHost) return; 
-              const nextState = !isActive;
-              setIsActive(nextState);
-              updateDoc(doc(db, 'rooms', roomId), { isActive: nextState });
+
+              if (isActive && currentMode === 'Study') {
+                Alert.alert("Abandon Focus?", "Stopping now will reset coins for everyone in this session! 😭", [
+                  { text: "Stay Focused", style: "cancel" },
+                  { text: "Quit", style: 'destructive', onPress: resetFocusSession }
+                ]);
+              } else {
+                const nextState = !isActive;
+                const updateData: any = { isActive: nextState };
+                if (nextState && currentMode === 'Study') {
+                  updateData.sessionStartedAt = Date.now();
+                }
+                setIsActive(nextState);
+                updateDoc(doc(db, 'rooms', roomId), updateData);
+              }
             }}
             disabled={!isHost}
           >
@@ -468,7 +494,6 @@ export default function RoomForStudyTogether() {
           <View style={styles.mateCard}>
             <ProfileAvatar avatar={item.avatar} size={40} bgColor="#F3F4F6" />
             <View style={[styles.mateInfo, {marginLeft: 12}]}><Text style={styles.mateName}>{item.name} {item.id === currentUserId && '(You)'}</Text><Text style={styles.mateSub}>{item.status}</Text></View>
-            <View style={styles.mateTimeBox}><Text style={styles.mateTimeText}>{formatTime(item.timeLeft || 0)}</Text></View>
           </View>
         )} />
       </View>
