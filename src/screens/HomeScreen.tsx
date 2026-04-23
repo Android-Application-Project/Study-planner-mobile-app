@@ -58,6 +58,11 @@ const PETS_DATA = {
   }
 };
 
+const NOTIFICATION_SOUNDS = {
+  complete: require('../assets/sounds/complete.mp3'), 
+  breakEnd: require('../assets/sounds/breakEnd.mp3'),
+};
+
 const PETS_LIST = Object.values(PETS_DATA);
 
 const AMBIENT_SOUNDS = [
@@ -82,7 +87,6 @@ export default function HomeScreen() {
   const [items, setItems] = useState([
     { label: 'Study Mode', value: 'Study' },
     { label: 'Relax Mode', value: 'Relax' },
-    { label: 'Deep Work', value: 'DeepWork' },
   ]);
 
   const [focusMinutes, setFocusMinutes] = useState(25);
@@ -105,6 +109,30 @@ export default function HomeScreen() {
   const timerViewRef = useRef<View>(null);
   const circleCenterRef = useRef({ x: 0, y: 0 });
 
+  const [isRelaxModalVisible, setRelaxModalVisible] = useState(false);
+  const [relaxMinutes, setRelaxMinutes] = useState(5);
+
+  const [totalFocusSeconds, setTotalFocusSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0); 
+
+  const [unlockedPets, setUnlockedPets] = useState<string[]>(['elephant']);
+
+  const playNotificationSound = async (type: 'complete' | 'breakEnd') => {
+    try {
+      const soundFile = type === 'complete' ? NOTIFICATION_SOUNDS.complete : NOTIFICATION_SOUNDS.breakEnd;
+      const { sound } = await Audio.Sound.createAsync(soundFile);
+      await sound.playAsync();
+      
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.log("Error playing notification sound:", error);
+    }
+  };
+
   const getTodayStr = () => new Date().toISOString().split('T')[0];
   const getYesterdayStr = () => {
     const d = new Date();
@@ -116,17 +144,43 @@ export default function HomeScreen() {
     if (!USER_ID) return;
     const today = getTodayStr();
     const yesterday = getYesterdayStr();
-    if (lastFocusDate === today) return;
 
     try {
       const userRef = doc(db, 'users', USER_ID);
-      let newStreak = streak;
-      if (lastFocusDate === yesterday) { newStreak += 1; } 
-      else { newStreak = 1; }
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        let currentCoins = data.coins || 0;
+        let newStreak = streak;
+        const earnedCoins = focusMinutes;
+        const totalNewCoins = currentCoins + earnedCoins;
 
-      await updateDoc(userRef, { streak: newStreak, lastFocusDate: today });
-    } catch (e) { console.log(e); }
+        if (lastFocusDate !== today) {
+          if (lastFocusDate === yesterday) { newStreak += 1; } 
+          else { newStreak = 1; }
+        }
+
+        await updateDoc(userRef, { 
+          streak: newStreak, 
+          lastFocusDate: today,
+          coins: totalNewCoins 
+        });
+
+        Alert.alert("Mission Complete!", `You earned 🐟 ${earnedCoins} coins!`);
+      }
+    } catch (e) { console.log("Coin update error:", e); }
   };
+
+  useEffect(() => {
+    if (currentMode === 'Relax') {
+      setIsActive(false); 
+      setRelaxModalVisible(true);
+    } else {
+      setTimeLeft(focusMinutes * 60);
+      setIsBreak(false);
+    }
+  }, [currentMode]);
 
   const syncToFirebase = async () => {
     if (!USER_ID) return;
@@ -141,18 +195,20 @@ export default function HomeScreen() {
   };
 
   const getCurrentPetImage = () => {
-    const petData = PETS_DATA[selectedPetId as keyof typeof PETS_DATA] || PETS_DATA.elephant;
-    if (showCryingPet) return petData.stages.crying;
-    if (isBreak) return petData.stages.child;
-    if (!isActive && timeLeft === focusMinutes * 60) return petData.stages.baby;
+      const petData = PETS_DATA[selectedPetId as keyof typeof PETS_DATA] || PETS_DATA.elephant;
+      if (showCryingPet) return petData.stages.crying;
+      const totalCurrentSessionSeconds = focusMinutes * 60;
 
-    const totalSeconds = focusMinutes * 60;
-    const percentageLeft = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 100;
+      const progressPercent = (elapsedSeconds / totalCurrentSessionSeconds) * 100;
 
-    if (percentageLeft > 70) return petData.stages.baby; 
-    if (percentageLeft <= 20) return petData.stages.adult; 
-    return petData.stages.child;
-  };
+      if (progressPercent >= 90) {
+        return petData.stages.adult;
+      } else if (progressPercent >= 30) {
+        return petData.stages.child;
+      } else {
+        return petData.stages.baby;
+      }
+    };
 
   useEffect(() => {
     if (!USER_ID) return;
@@ -163,6 +219,8 @@ export default function HomeScreen() {
         const data = snap.data();
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
+
+        setUnlockedPets(data.unlockedPets)
 
         if (data.selectedPetId){
           setSelectedPetId(data.selectedPetId)
@@ -191,40 +249,38 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let iv: any = null;
+    
     if (isActive && timeLeft > 0) {
-      iv = setInterval(() => setTimeLeft(t => t - 1), 1000);
+      iv = setInterval(() => {
+        setTimeLeft(t => t - 1);
+        if (currentMode === 'Study') { 
+          setElapsedSeconds(prev => prev + 1);
+        }
+      }, 1000);
     } else if (isActive && timeLeft === 0) {
-
       if (vibrationEnabled) {
-        const VIBRATION_PATTERN = [0, 500, 200, 500]
-        Vibration.vibrate(VIBRATION_PATTERN)
+        Vibration.vibrate([0, 500, 200, 500]);
       }
 
-      const COINS_PER_MINUTE = 1
-      const earnedCoins = focusMinutes * COINS_PER_MINUTE
+      setIsActive(false);
 
-      updateDoc(doc(db, 'users', USER_ID as string), {
-        coins: increment(earnedCoins),
-        completedMinutes: increment(focusMinutes)
-      })
-
-      setTimeout(() => {
-        if (!isBreak) {
-          if (currentRound < totalRounds) {
-            setIsBreak(true); setTimeLeft(breakMinutes * 60);
-            Alert.alert("Break Time!");
-          } else {
-            setIsActive(false); setCurrentRound(1); setTimeLeft(focusMinutes * 60);
-            handleUpdateStreak(); 
-            Alert.alert("Mission Complete!");
-          }
-        } else {
-          setCurrentRound(r => r + 1); setIsBreak(false); setTimeLeft(focusMinutes * 60);
-        }
-      }, 100)
+      if (currentMode === 'Study') {
+        playNotificationSound('complete');
+        handleUpdateStreak(); 
+        
+        setElapsedSeconds(0);
+        Alert.alert("Mission Complete!", "You finished your session!");
+      } else {
+        playNotificationSound('breakEnd');
+        setCurrentMode('Study'); 
+      }
+      
+      setTimeLeft(focusMinutes * 60);
+      setElapsedSeconds(0);
     }
+    
     return () => clearInterval(iv);
-  }, [isActive, timeLeft, isBreak, currentRound, totalRounds]);
+  }, [isActive, timeLeft, currentMode]);
 
   useEffect(() => {
     navigation.setParams({ isTimerActive: isActive });
@@ -256,7 +312,7 @@ export default function HomeScreen() {
     });
 
     return unsubscribe;
-  }, [navigation, strictModeEnabled, isActive])
+  }, [navigation, strictModeEnabled, isActive, vibrationEnabled, timeLeft])
 
   useEffect(() => { syncToFirebase(); }, [currentMode, isActive, isBreak, selectedPetId]);
 
@@ -266,18 +322,26 @@ export default function HomeScreen() {
   }, []);
 
   const handleToggleTimer = () => {
-    if (isActive && !isBreak) {
-      Alert.alert("Abandon your pet? 😭", "Stopping now will reset progress!", [
-        { text: "Stay Focused", style: "cancel" },
-        { text: "Abandon", style: "destructive", onPress: () => {
-          setIsActive(false);
-          setTimeLeft(focusMinutes * 60);
-          setShowCryingPet(true);
-          setTimeout(() => setShowCryingPet(false), 4000);
-        }}
-      ]);
+    if (isActive && currentMode === 'Study') {
+      Alert.alert(
+        "Abandon Focus?", 
+        "Stopping now will reset your accumulated coins for this session! 😭", 
+        [
+          { text: "Stay Focused", style: "cancel" },
+          { 
+            text: "Abandon", 
+            style: "destructive", 
+            onPress: () => {
+              setIsActive(false);
+              setElapsedSeconds(0); 
+              setTimeLeft(focusMinutes * 60);
+              setShowCryingPet(true);
+              setTimeout(() => setShowCryingPet(false), 4000);
+            } 
+          }
+        ]
+      );
     } else {
-      if (!isActive) setShowCryingPet(false);
       setIsActive(!isActive);
     }
   };
@@ -320,7 +384,7 @@ export default function HomeScreen() {
   const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
 
   const renderPetOption = ({ item }: { item: any }) => {
-    const isUnlocked = item.id === 'elephant'; 
+    const isUnlocked = unlockedPets.includes(item.id)
     const isSelected = selectedPetId === item.id;
 
     return (
@@ -342,7 +406,7 @@ export default function HomeScreen() {
           source={item.stages.adult} 
           style={[
             styles.petOptionImage,
-            !isUnlocked && { tintColor: '#666' } // 沒解鎖圖片變灰
+            !isUnlocked && { tintColor: '#666' }
           ]} 
           resizeMode="contain" 
         />
@@ -379,11 +443,30 @@ export default function HomeScreen() {
           <DropDownPicker open={open} value={currentMode} items={items} setOpen={setOpen} setValue={setCurrentMode} setItems={setItems} style={styles.dropdown} dropDownContainerStyle={styles.dropdownMenu} showArrowIcon={true} textStyle={styles.dropdownLabel} />
         </View>
         <View style={styles.headerRightGroup}>
-          <TouchableOpacity onPress={() => setPetModalVisible(true)} disabled={isActive} style={[styles.headerIconBtn, isActive && { opacity: 0.3 }]}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('CalendarScreen')} 
+            style={styles.headerIconBtn}
+          >
+            <Feather name="calendar" size={22} color={theme.colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => setPetModalVisible(true)} 
+            disabled={isActive} 
+            style={[styles.headerIconBtn, { marginLeft: 10 }, isActive && { opacity: 0.3 }]}
+          >
             <MaterialCommunityIcons name="paw" size={22} color={theme.colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerIconBtn, { marginLeft: 10 }]} onPress={() => setSoundModalVisible(true)}>
-            <MaterialCommunityIcons name={selectedSoundId === 'none' ? "music-note-off" : "music-note"} size={22} color={theme.colors.primary} />
+
+          <TouchableOpacity 
+            style={[styles.headerIconBtn, { marginLeft: 10 }]} 
+            onPress={() => setSoundModalVisible(true)}
+          >
+            <MaterialCommunityIcons 
+              name={selectedSoundId === 'none' ? "music-note-off" : "music-note"} 
+              size={22} 
+              color={theme.colors.primary} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -405,15 +488,50 @@ export default function HomeScreen() {
 
       <View style={styles.infoCard}>
         <Text style={styles.timeText}>{Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
-        <TouchableOpacity style={styles.summaryBadge} onPress={() => setModalVisible(true)}>
-          <Feather name="clock" size={14} color={theme.colors.primary} />
-          <Text style={styles.summaryText}>{breakMinutes}m Rest • Round {currentRound}/{totalRounds}</Text>
-        </TouchableOpacity>
+        
       </View>
 
       <TouchableOpacity style={styles.mainButton} onPress={handleToggleTimer}>
         <Text style={styles.mainButtonText}>{isActive ? 'PAUSE' : 'START'}</Text>
       </TouchableOpacity>
+
+      <Modal visible={isRelaxModalVisible} animationType="fade" transparent>
+        <Pressable style={styles.modalOverlay} onPress={() => {
+          setRelaxModalVisible(false);
+          setCurrentMode('Study'); 
+        }}>
+          <Pressable style={styles.relaxModalContent} onPress={e => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            <Ionicons name="cafe" size={50} color={theme.colors.primary} style={{alignSelf: 'center', marginBottom: 15}} />
+            <Text style={styles.modalTitle}>Take a Break</Text>
+            
+            <View style={styles.settingRow}>
+              <Text style={styles.label}>Relax Duration</Text>
+              <View style={styles.stepper}>
+                <TouchableOpacity onPress={() => setRelaxMinutes(Math.max(1, relaxMinutes - 1))}>
+                  <Feather name="minus" size={20}/>
+                </TouchableOpacity>
+                <Text style={styles.stepVal}>{relaxMinutes}m</Text>
+                <TouchableOpacity onPress={() => setRelaxMinutes(relaxMinutes + 1)}>
+                  <Feather name="plus" size={20}/>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.confirmBtn} 
+              onPress={() => {
+                setTimeLeft(relaxMinutes * 60);
+                setIsBreak(true);
+                setIsActive(true);
+                setRelaxModalVisible(false);
+              }}
+            >
+              <Text style={{color:'#FFF', fontWeight:'bold', fontSize: 16}}>Start Resting</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={isPetModalVisible} animationType="slide" transparent>
         <Pressable style={styles.modalOverlay} onPress={() => setPetModalVisible(false)}>
@@ -769,5 +887,22 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 10,
     fontWeight: '600',
     color: theme.colors.text1,
+  },
+
+  relaxModalContent: {
+    backgroundColor: '#FFF', 
+    padding: 30,
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    width: '100%',
+  },
+  modeIndicatorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    paddingVertical: 6,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    marginTop: 10,
   },
 });
