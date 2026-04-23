@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
 import { useTheme } from '../utils/ThemeContext';
-import { Theme } from '../utils/Themes'; 
+import { Theme, themes } from '../utils/Themes'; 
 
 interface StoreItem {
   id: string;
@@ -13,12 +13,12 @@ interface StoreItem {
   color?: string; 
 }
 
-const mockThemes: StoreItem[] = [
-  { id: 'default', name: 'Default', price: 0, color: '#84A98C' },
-  { id: 'blue', name: 'Ocean Blue', price: 150, color: '#64B5F6' },
-  { id: 'purple', name: 'Royal Purple', price: 200, color: '#BA68C8' },
-  { id: 'darkBlue', name: 'Dark Mode', price: 300, color: '#2F3E46' },
-];
+const themeStoreItem : StoreItem[] = Object.entries(themes).map(([key, value]) => ({
+  id: key,
+  name: value.name,
+  price: value.price,
+  color: value.colors.primary
+}))
 
 const animals: StoreItem[] = [
   { id: 'elephant', name: 'Elephant', price: 0 },
@@ -60,7 +60,7 @@ export default function StoreScreen() {
   const [currentPetId, setCurrentPetId] = useState('elephant');
   const [unlockedThemes, setUnlockedThemes] = useState(['default']);
 
-  const displayData: StoreItem[] = activeTab === 'themes' ? mockThemes : animals;
+  const displayData: StoreItem[] = activeTab === 'themes' ? themeStoreItem : animals;
 
   useEffect(() => {
     if (!USER_ID) return;

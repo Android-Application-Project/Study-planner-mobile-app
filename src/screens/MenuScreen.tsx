@@ -253,25 +253,25 @@ export default function MenuScreen() {
                     <View style={styles.settingsGroup}>
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <MaterialIcons name="vibration" size={24} color="#556B52" />
+                                <MaterialIcons name="vibration" size={24} color={theme.colors.primary} />
                                 <Text style={styles.settingText}>Vibration</Text>
                             </View>
                             <Switch 
                                 value={vibrationEnabled} 
                                 onValueChange={setVibrationEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
 
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <Ionicons name="notifications-outline" size={22} color="#556B52" />
+                                <Ionicons name="notifications-outline" size={22} color={theme.colors.primary}/>
                                 <Text style={styles.settingText}>Notifications</Text>
                             </View>
                             <Switch 
                                 value={notificationsEnabled} 
                                 onValueChange={handleNotificationChange}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
 
@@ -283,7 +283,7 @@ export default function MenuScreen() {
                             <Switch 
                                 value={strictModeEnabled} 
                                 onValueChange={setStrictModeEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
 
@@ -295,7 +295,7 @@ export default function MenuScreen() {
                             <Switch 
                                 value={libraryAccessEnabled} 
                                 onValueChange={setLibraryAccessEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
                     </View>
@@ -317,7 +317,7 @@ export default function MenuScreen() {
                         <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('LeaderBoardScreen')}>
                             <View style={styles.settingLeft}>
                                 <MaterialIcons name="leaderboard" size={24} color={theme.colors.primary} />
-                                <Text style={styles.settingText}>Leader Board</Text>
+                                <Text style={styles.settingText}>Leaderboard</Text>
                             </View>
                             
                             <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
@@ -469,7 +469,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         marginBottom: 20,
     },
     statBox: {
-        backgroundColor: '#FFF',
+        backgroundColor: theme.colors.card,
         width: '31%',
         paddingVertical: 15,
         borderRadius: 15,
@@ -483,11 +483,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     statValue: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#556B52',
+        color: theme.colors.text1,
     },
     statLabel: {
         fontSize: 11,
-        color: '#8A9A85',
+        color: theme.colors.text,
         marginTop: 5,
     },
     menuList: {
@@ -573,7 +573,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     uploadOptionText: { marginLeft: 10, color: '#007AFF', fontWeight: 'bold' },
     avatarImage: { width: 70, height: 70, borderRadius: 35 },
     settingsGroup: {
-        backgroundColor: '#FFF',
+        backgroundColor: theme.colors.card,
         borderRadius: 20,
         paddingHorizontal: 15,
         elevation: 1,

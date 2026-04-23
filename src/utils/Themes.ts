@@ -4,6 +4,7 @@ export type Theme = {
   name: string;
   dark: boolean;
   fonts: any;
+  price: number;
   colors: {
     primary: string;
     secondary1: string,
@@ -37,13 +38,14 @@ export const DefaultTheme = {
   name: 'default',
   dark: false,
   fonts: navFonts,
+  price: 0,
   colors: {
     primary: '#84A98C', 
     secondary1: '#2F3E46', 
     secondary2: '#b1c7b6',
     text1: '#354F52',
     text2: '#52796F',
-    card: '#baceac',   // #cddec3 
+    card: '#baceac', 
     text: '#354F52',
     border: 'transparent',
     notification: '#ff0000',
@@ -51,28 +53,11 @@ export const DefaultTheme = {
   },
 };
 
-export const Default1Theme = {
-  name: 'default',
-  dark: false,
-  fonts: navFonts,
-  colors: {
-    primary: '#84A98C',
-    secondary1: '#2F3E46',
-    secondary2: '#CBF3BB',
-    text1: '#354F52',
-    text2: '#52796F',
-    card: '#C2D1B8',      
-    text: '#354F52',     
-    border: 'transparent',
-    notification: '#ff0000',
-    background: '#CAD2C5',
-  },
-};
-
 export const BlueTheme = {
   name: 'blue',
   dark: false,
   fonts: navFonts,
+  price: 150,
   colors: {
     primary: '#2196F3',
     secondary1: '#64B5F6',
@@ -90,6 +75,7 @@ export const PurpleTheme = {
   name: 'purple',
   dark: false,
   fonts: navFonts,
+  price: 200,
   colors: {
     primary: '#9C27B0',
     secondary1: '#BA68C8',
@@ -108,6 +94,7 @@ export const DarkBlueTheme = {
   name: 'darkBlue',
   dark: true,
   fonts: navFonts,
+  price: 300,
   colors: {
     primary: '#215796',
     secondary1: '#1E88E5',
@@ -122,11 +109,31 @@ export const DarkBlueTheme = {
   },
 };
 
+export const BeigeTheme = {
+  name: 'beige',
+  dark: true,
+  fonts: navFonts,
+  price: 200,
+  colors: {
+    primary: '#7fc4bd',
+    secondary1: '#a4bbcf',
+    secondary2: '#f3e9d4',
+    text1: '#4e3425',
+    text2: '#4b4748',
+    card: '#fffaf2',
+    text: '#605c59',
+    border: '#f2d2bb',
+    notification: '#FF5252',
+    background: '#eee7d5',
+  },
+};
+
 export const themes = {
   default: DefaultTheme,
   blue: BlueTheme,
   purple: PurpleTheme,
-  darkBlue: DarkBlueTheme
+  darkBlue: DarkBlueTheme,
+  beige: BeigeTheme
 };
 
 export type ThemeName = keyof typeof themes;
