@@ -391,7 +391,7 @@ export default function RoomScreen() {
                 onPress={() => initiateJoin(item)}
               >
                 <Text style={styles.joinButtonText}>
-                  {isHost ? 'Enter' : (isFull ? 'Full' : 'Join')}
+                  {isFull ? 'Full' : 'Join'}
                 </Text>
               </TouchableOpacity>
             </View>

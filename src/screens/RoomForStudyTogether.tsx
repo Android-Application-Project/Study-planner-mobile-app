@@ -81,6 +81,7 @@ export default function RoomForStudyTogether() {
   const { roomId, roomName } = route.params || {};
   const currentUserId = auth.currentUser?.uid;
 
+  const chatScrollViewRef = useRef<ScrollView>(null);
 
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [roomMessages, setRoomMessages] = useState<any[]>([]);
@@ -514,27 +515,66 @@ export default function RoomForStudyTogether() {
       </Modal>
 
       <Modal visible={isChatModalVisible} animationType="slide" transparent>
-        <Pressable style={styles.modalOverlay} onPress={() => setChatModalVisible(false)}>
-          <View style={[styles.modalContent, { height: '75%' }]}>
-            <View style={styles.modalHandle} /><Text style={styles.modalTitle}>Quick Chat</Text>
-            <ScrollView style={{ flex: 1, marginBottom: 15 }} showsVerticalScrollIndicator={false}>
-              {roomMessages.map((msg, index) => (
-                <View 
-                  key={index} 
-                  style={{ alignSelf: msg.senderId === currentUserId ? 'flex-end' : 'flex-start', 
-                  backgroundColor: msg.senderId === currentUserId ? theme.colors.primary : '#EEE', padding: 12, borderRadius: 18, marginBottom: 8, maxWidth: '80%' 
-                }}>
-                  <Text style={{ fontSize: 10, color: msg.senderId === currentUserId ? '#EEE' : '#666', marginBottom: 2 }}>{msg.senderName}</Text>
-                  <Text style={{ color: msg.senderId === currentUserId ? '#FFF' : '#000', fontWeight: '600' }}>{msg.content}</Text>
-                </View>
-              ))}
-            </ScrollView>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalOverlay} onPress={() => setChatModalVisible(false)} />
+          
+          <View style={[styles.modalContent, { height: '75%', paddingBottom: 20 }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Quick Chat</Text>
+            
+            <View style={{ flex: 1 }}>
+              <ScrollView 
+                ref={chatScrollViewRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: 5, paddingBottom: 20 }}
+                showsVerticalScrollIndicator={true}
+                onContentSizeChange={() => chatScrollViewRef.current?.scrollToEnd({ animated: true })}
+              >
+                {roomMessages.map((msg, index) => (
+                  <View 
+                    key={index} 
+                    style={{ 
+                      alignSelf: msg.senderId === currentUserId ? 'flex-end' : 'flex-start', 
+                      backgroundColor: msg.senderId === currentUserId ? theme.colors.primary : '#EEE', 
+                      padding: 12, 
+                      borderRadius: 18, 
+                      marginBottom: 8, 
+                      maxWidth: '80%' 
+                    }}
+                  >
+                    <Text style={{ 
+                      fontSize: 10, 
+                      color: msg.senderId === currentUserId ? '#EEE' : '#666', 
+                      marginBottom: 2 
+                    }}>
+                      {msg.senderName}
+                    </Text>
+                    <Text style={{ color: msg.senderId === currentUserId ? '#FFF' : '#000', fontWeight: '600' }}>
+                      {msg.content}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
             <View style={styles.quickChatSection}>
-              <View style={styles.emojiRow}>{QUICK_EMOJIS.map(emoji => (<TouchableOpacity key={emoji} onPress={() => sendQuickMessage(emoji)}><Text style={{ fontSize: 32 }}>{emoji}</Text></TouchableOpacity>))}</View>
-              <View style={styles.textMsgGrid}>{QUICK_MESSAGES.map(msg => (<TouchableOpacity key={msg} style={styles.quickMsgBtn} onPress={() => sendQuickMessage(msg)}><Text style={styles.quickMsgText}>{msg}</Text></TouchableOpacity>))}</View>
+              <View style={styles.emojiRow}>
+                {QUICK_EMOJIS.map(emoji => (
+                  <TouchableOpacity key={emoji} onPress={() => sendQuickMessage(emoji)}>
+                    <Text style={{ fontSize: 32 }}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.textMsgGrid}>
+                {QUICK_MESSAGES.map(msg => (
+                  <TouchableOpacity key={msg} style={styles.quickMsgBtn} onPress={() => sendQuickMessage(msg)}>
+                    <Text style={styles.quickMsgText}>{msg}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       <Modal visible={isSoundModalVisible} animationType="fade" transparent>
