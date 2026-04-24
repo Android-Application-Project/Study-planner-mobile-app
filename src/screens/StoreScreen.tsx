@@ -3,8 +3,9 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
-import { useTheme } from '../utils/ThemeContext';
-import { Theme, themes } from '../utils/Themes'; 
+import { useTheme } from '../utils/ThemeContext'
+import { Theme, themes } from '../utils/Themes'
+import Currency, { formatCurrency } from 'src/components/Currency'
 
 interface StoreItem {
   id: string;
@@ -32,6 +33,13 @@ const ANIMAL_IMAGES = {
   shark: require('../assets/Animal/AdultShark.png'),
 };
 
+const THEME_IMAGES = {
+  default: require('../assets/Theme/green.png'),
+  beige: require('../assets/Theme/beige.png'),
+  blue: require('../assets/Theme/blue.png'),
+  purple: require('../assets/Theme/purple.png')
+};
+
 const screenWidth = Dimensions.get('window').width;
 const cardWidth = (screenWidth - 60 - 15) / 2;
 
@@ -53,7 +61,6 @@ export default function StoreScreen() {
     return () => unsubscribe()
   }, [])
 
-  // --- 狀態控制 ---
   const [activeTab, setActiveTab] = useState<'themes' | 'animals'>('themes');
   const [coins, setCoins] = useState(0);
   const [unlockedPets, setUnlockedPets] = useState(['elephant']);
@@ -71,7 +78,6 @@ export default function StoreScreen() {
         setUnlockedPets(data.unlockedPets || ['elephant']);
         setCurrentPetId(data.selectedPetId || 'elephant');
         setUnlockedThemes(data.unlockedThemes || ['default']);
-        // 這裡可以根據你 ThemeProvider 的實作來同步 currentTheme
       }
     });
     return () => unsub();
@@ -90,14 +96,13 @@ export default function StoreScreen() {
         setTheme(item.id as any);
         await updateDoc(userRef, { currentThemeId: item.id });
       }
-      Alert.alert("Success", `${item.name} equipped!`);
     } else {
       if (coins < item.price) {
-        Alert.alert("Error", "Not enough 🐟 coins!");
+        Alert.alert("Error", "Not enough coins!");
         return;
       }
 
-      Alert.alert("Confirm Purchase", `Buy ${item.name} for 🐟 ${item.price}?`, [
+      Alert.alert("Confirm Purchase", `Buy ${item.name} for ${formatCurrency(item.price)} coins?`, [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Buy", 
@@ -134,7 +139,7 @@ export default function StoreScreen() {
         onPress={() => handleAction(item)}
       >
         <Text style={[styles.actionButtonText, isOwned && { color: theme.colors.text1 }]}>
-          {isOwned ? "Use" : `🐟 ${item.price}`}
+          {isOwned ? "Use" : <Currency amount={item.price}/>}
         </Text>
       </TouchableOpacity>
     );
@@ -146,7 +151,13 @@ export default function StoreScreen() {
     return (
       <View style={styles.cardContainer}>
         {isTheme ? (
-          <View style={[styles.previewArea, { backgroundColor: item.color }]} />
+          <View style={styles.previewArea}>
+              <Image
+                source={THEME_IMAGES[item.id as keyof typeof THEME_IMAGES]}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            </View>        
         ) : (
           <View style={[styles.previewArea, styles.animalPreviewBg]}>
             <Image 
@@ -166,15 +177,13 @@ export default function StoreScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Store</Text>
         <View style={styles.coinBadge}>
-          <Text style={styles.coinText}>🐟 {coins}</Text>
+          <Currency amount={coins}/>
         </View>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity 
           style={[styles.tabButton, activeTab === 'themes' && styles.activeTab]}
@@ -319,7 +328,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   buttonBuy: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.background,
   },
   actionButtonText: {
     fontSize: 14,

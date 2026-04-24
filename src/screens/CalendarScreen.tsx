@@ -646,7 +646,7 @@ const createStyles = (theme: Theme) =>
       backgroundColor: theme.colors.text2,
       borderBottomLeftRadius: 35,
       borderBottomRightRadius: 35,
-      paddingTop: 40,
+      paddingTop: 20,
       paddingBottom: 15,
       overflow: 'hidden',
     },

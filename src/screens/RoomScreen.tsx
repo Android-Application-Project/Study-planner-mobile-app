@@ -37,21 +37,9 @@ export default function RoomScreen() {
     const [breakTime, setBreakTime] = useState(5);
     const [sessions, setSessions] = useState(4);
 
-    const subjects = ['Math', 'English', 'German', 'Finnish', 'Design', 'Coding'];
-    const memberOptions = [2, 4, 6, 8, 10]; 
-
-    const subjectIcons: Record<string, string> = {
-      'Math': '📐', 'English': '📚', 'Science': '🔬', 
-      'History': '🏺', 'Design': '🎨', 'Coding': '💻'
-    };
+    const memberOptions = [2, 4, 6, 8, 10, 12]; 
 
     const [rooms, setRooms] = useState<any[]>([]);
-    
-    const [isJoinModalVisible, setJoinModalVisible] = useState(false);
-    const [selectedRoomToJoin, setSelectedRoomToJoin] = useState<any>(null);
-    const [myJoinFocusTime, setMyJoinFocusTime] = useState(25);
-    const [myJoinBreakTime, setMyJoinBreakTime] = useState(5);
-    const [myJoinSubject, setMyJoinSubject] = useState('Study');
 
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [inputPassword, setInputPassword] = useState('');
@@ -143,12 +131,6 @@ export default function RoomScreen() {
       }
     }
 
-    const adjustSetting = (type: 'focus' | 'break' | 'sessions', amount: number) => {
-        if (type === 'focus') setFocusTime(prev => Math.max(5, prev + amount));
-        if (type === 'break') setBreakTime(prev => Math.max(1, prev + amount));
-        if (type === 'sessions') setSessions(prev => Math.max(1, prev + amount));
-    };
-
     const handleCreateRoom = async () => {
       if (newRoomName.trim() === '') {
         alert("Please enter a room name!"); 
@@ -165,7 +147,6 @@ export default function RoomScreen() {
         return;
       }
 
-      const finalSubject = customSubject.trim() !== '' ? customSubject.trim() : (selectedSubjects[0] || 'Study');
       
       try {
         const userRef = doc(db, 'users', currentUserId);
@@ -180,8 +161,6 @@ export default function RoomScreen() {
           name: newRoomName,
           members: 1, 
           max: maxMembers,
-          icon: subjectIcons[finalSubject] || '💡',
-          subject: finalSubject,
           mode: roomMode,
           focusTime: focusTime,
           breakTime: breakTime,
@@ -265,93 +244,44 @@ export default function RoomScreen() {
 
     const handleJoinRoom = async (item: any) => {
       const isAlreadyInRoom = item.activeUsers?.some((u: any) => u.id === currentUserId);
+      const currentCount = item.activeUsers?.length || 0;
 
-      if (!isAlreadyInRoom && item.members >= item.max){
-        Alert.alert("The room is full", "This room is FULL, join later please.");
-        return;
+      if (!isAlreadyInRoom && currentCount >= item.max) {
+        return Alert.alert("Room is full", "Please try another room.");
       }
 
-      if (!isAlreadyInRoom){
+      if (!isAlreadyInRoom) {
         try {
-          const userRef = doc(db, 'users', currentUserId as string);
-          const userSnap = await getDoc(userRef);
+          const userSnap = await getDoc(doc(db, 'users', currentUserId!));
           const userData = userSnap.exists() ? userSnap.data() : {};
-          const myAvatar = userData.avatar || '👤';
-          const myName = userData.name || userData.username || 'Unknown';
-
           const roomRef = doc(db, 'rooms', item.id);
+          
           await updateDoc(roomRef, {
-            members: increment(1),
             activeUsers: arrayUnion({
               id: currentUserId,
-              name: myName,
-              avatar: myAvatar,
+              name: userData.name || userData.username || 'Buddy',
+              avatar: userData.avatar || '👤',
               isHost: currentUserId === item.hostId
-            })
+            }),
+            members: currentCount + 1
           });
-        } catch (error){
-          console.error("People updated fail:", error);
+        } catch (error) {
+          console.error("Join Room Error:", error);
           return;
         }
       }
 
-      if(item.mode === 'Shared'){
-        navigation.navigate('RoomForStudyTogether', {
-          roomId: item.id,
-          roomName: item.name,
-          subject: item.subject,
-          icon: item.icon,
-          focusTime: item.focusTime,
-          breakTime: item.breakTime,
-          sessions: item.sessions
+      if (item.mode === 'Shared') {
+        navigation.navigate('RoomForStudyTogether', { 
+          roomId: item.id, 
+          roomName: item.name 
         });
       } else {
-        if (currentUserId === item.hostId) {
-          navigation.navigate('RoomForIndependentStudy',{
-            roomId : item.id,
-            roomName: item.name,
-            icon: item.icon,
-            subject: item.subject,
-            focusTime: item.focusTime,
-            breakTime: item.breakTime,
-            sessions: item.sessions
-          });
-        } else {
-          setSelectedRoomToJoin(item);
-          setMyJoinSubject(item.subject);
-          setMyJoinFocusTime(25);
-          setMyJoinBreakTime(5);
-          setJoinModalVisible(true);
-        }
+        navigation.navigate('RoomForIndependentStudy', { 
+          roomId: item.id, 
+          roomName: item.name 
+        });
       }
-    };
-
-    const handleCancelJoin = async () => {
-      setJoinModalVisible(false);
-
-      if (selectedRoomToJoin && currentUserId !== selectedRoomToJoin.hostId) {
-        const roomRef = doc(db, 'rooms', selectedRoomToJoin.id);
-        await updateDoc(roomRef, {
-          members: increment(-1)
-        })
-      }
-    }
-
-    const confirmJoinIndependentRoom = () => {
-      setJoinModalVisible(false);
-      navigation.navigate('RoomForIndependentStudy', {
-        roomId: selectedRoomToJoin.id,
-        roomName: selectedRoomToJoin.name,
-        icon: selectedRoomToJoin.icon,
-        subject: myJoinSubject,
-        focusTime: myJoinFocusTime,
-        breakTime: myJoinBreakTime
-      })
-    }
-
-    const adjustJoinSetting = (type: 'focus' | 'break', amount: number) => {
-      if (type === 'focus') setMyJoinFocusTime(prev => Math.max(5, prev + amount));
-      if (type === 'break') setMyJoinBreakTime(prev => Math.max(1, prev + amount));
     };
 
     const handleAcceptInvite = async (notif: any) => {
@@ -389,6 +319,9 @@ export default function RoomScreen() {
 
     const renderRoomCard = ({ item }: any) => {
         const isHost = item.hostId === currentUserId;
+        
+        const currentPeople = item.activeUsers?.length || 0;
+        const isFull = currentPeople >= item.max;
 
         return (
           <View style={styles.roomCard}>
@@ -404,21 +337,27 @@ export default function RoomScreen() {
               <View style={styles.roomInfoColumn}>
                 <View style={styles.roomNameRow}>
                   <Text style={styles.roomName} numberOfLines={1}>{item.name}</Text>
-                  {item.isLocked && <Feather name="lock" size={14} color={theme.colors.text2} style={{ marginLeft: 6, marginTop: 2 }} />}
+                  {item.isLocked && (
+                    <Feather name="lock" size={14} color={theme.colors.text2} style={{ marginLeft: 6 }} />
+                  )}
                 </View>
+
                 <View style={styles.roomMetaRow}>
-                  <View style={styles.miniPill}>
-                    <Text style={styles.miniPillText}>{item.subject}</Text>
-                  </View>
                   
-                  <View style={[styles.modePill, item.mode === 'Independent' && styles.modePillIndependent]}>
+                  <View style={[
+                    styles.modePill, 
+                    item.mode === 'Independent' && styles.modePillIndependent
+                  ]}>
                      <Feather 
                         name={item.mode === 'Shared' ? 'users' : 'headphones'} 
                         size={12} 
                         color={item.mode === 'Shared' ? theme.colors.primary : '#F59E0B'} 
-                        style={{marginRight: 4}} 
+                        style={{ marginRight: 4 }} 
                      />
-                     <Text style={[styles.modePillText, item.mode === 'Independent' && {color: '#F59E0B'}]}>
+                     <Text style={[
+                        styles.modePillText, 
+                        item.mode === 'Independent' && { color: '#F59E0B' }
+                     ]}>
                         {item.mode}
                      </Text>
                   </View>
@@ -436,16 +375,24 @@ export default function RoomScreen() {
             </View>
 
             <View style={styles.cardActionSection}>
-              <Text style={styles.cardActionDetail}>
-                  👤 {item.members}/{item.max} Joined • Starts soon
+              <Text style={[
+                styles.cardActionDetail,
+                isFull && { color: '#EF4444' } 
+              ]}>
+                  👤 {currentPeople}/{item.max} {isFull ? 'Full' : 'Joined'}
               </Text>
 
               <TouchableOpacity 
-                style={styles.joinButton}
+                style={[
+                  styles.joinButton,
+                  isFull && { backgroundColor: '#D1D5DB' }
+                ]}
                 activeOpacity={0.8}
                 onPress={() => initiateJoin(item)}
               >
-                <Text style={styles.joinButtonText}>Join</Text>
+                <Text style={styles.joinButtonText}>
+                  {isFull ? 'Full' : 'Join'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View> 
@@ -458,7 +405,14 @@ export default function RoomScreen() {
           <Feather name = 'mail' size = {20} color = {theme.colors.primary} style = {{ marginRight: 10}} />
           <View style = {{ flex: 1 }}>
             <Text style = {styles.notifText}>
-              <Text style={{ fontWeight: 'bold' }}>{item.senderName}</Text> invited you to join <Text style={{ fontWeight: 'bold' }}>{item.roomName}</Text>!
+              <Text 
+                style={
+                  { 
+                    fontWeight: 'bold' 
+                  }
+                }>{
+                  item.senderName}
+              </Text> invited you to join <Text style={{ fontWeight: 'bold' }}>{item.roomName}</Text>!
             </Text>
           </View>
         </View>
@@ -595,55 +549,6 @@ export default function RoomScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {roomMode === 'Shared' && (
-                      <>
-                        <View style={styles.settingRow}>
-                          <View>
-                              <Text style={styles.inputLabel}>Focus Duration</Text>
-                          </View>
-                          <View style={styles.stepper}>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('focus', -5)}>
-                                  <Feather name="minus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                              <Text style={styles.stepText}>{focusTime} m</Text>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('focus', 5)}>
-                                  <Feather name="plus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        <View style={styles.settingRow}>
-                          <View>
-                              <Text style={styles.inputLabel}>Break Duration</Text>
-                          </View>
-                          <View style={styles.stepper}>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('break', -1)}>
-                                  <Feather name="minus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                              <Text style={styles.stepText}>{breakTime} m</Text>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('break', 1)}>
-                                  <Feather name="plus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                          </View>
-                        </View>
-                        
-                        <View style={styles.settingRow}>
-                          <View>
-                              <Text style={styles.inputLabel}>Sessions</Text>
-                          </View>
-                          <View style={styles.stepper}>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('sessions', -1)}>
-                                  <Feather name="minus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                              <Text style={styles.stepText}>{sessions}</Text>
-                              <TouchableOpacity style={styles.stepButton} onPress={() => adjustSetting('sessions', 1)}>
-                                  <Feather name="plus" size={20} color={theme.colors.text1} />
-                              </TouchableOpacity>
-                          </View>
-                        </View>
-                      </>
-                    )}
-
                     <Text style={styles.inputLabel}>Max members</Text>
                     <View style={styles.circleOptionsContainer}>
                       {memberOptions.map((num) => {
@@ -658,34 +563,6 @@ export default function RoomScreen() {
                           </TouchableOpacity>
                         );
                       })}
-                    </View>
-
-                    <Text style={styles.inputLabel}>Subject tags</Text>
-                    <View style={styles.pillContainer}>
-                      {subjects.map((sub) => {
-                        const isSelected = selectedSubjects.includes(sub);
-                        return (
-                          <TouchableOpacity 
-                            key={sub}
-                            style={[styles.pillButton, isSelected && { backgroundColor: theme.colors.primary } ]}
-                            onPress={() => toggleSubject(sub)}
-                          >
-                            <Text style={[styles.pillText, isSelected && { color: '#FFF' }]}>{sub}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {!showCustomInput && (
-                        <TouchableOpacity 
-                          style = {styles.addPillButton}
-                          onPress={() => {
-                            setShowCustomInput(true);
-                            setSelectedSubjects([]);
-                          }}
-                        >
-                          <Feather name = 'plus' size = {18} color = {theme.colors.text2} />
-                        </TouchableOpacity>
-                      )}
                     </View>
 
                     {showCustomInput && (
@@ -716,67 +593,6 @@ export default function RoomScreen() {
                 </View>
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-
-        <Modal animationType="fade" transparent={true} visible={isJoinModalVisible} onRequestClose={handleCancelJoin}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-            <Pressable style={styles.modalOverlayJoin} onPress={handleCancelJoin}>
-              <Pressable style={styles.modalContentJoin} onPress={(e) => e.stopPropagation()}>
-                <View style={styles.modalHandle} />
-                
-                <Text style={styles.modalTitle}>Join {selectedRoomToJoin?.name}</Text>
-                <Text style={styles.modalSubtitle}>This is an independent room. Set your own goals!</Text>
-
-                <Text style={styles.inputLabel}>My Subject</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="What are you studying?"
-                  value={myJoinSubject}
-                  onChangeText={setMyJoinSubject}
-                />
-
-                <View style={styles.settingRow}>
-                  <View>
-                      <Text style={styles.inputLabel}>My Focus Time</Text>
-                  </View>
-                  <View style={styles.stepper}>
-                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('focus', -5)}>
-                          <Feather name="minus" size={20} color={theme.colors.text1} />
-                      </TouchableOpacity>
-                      <Text style={styles.stepText}>{myJoinFocusTime} m</Text>
-                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('focus', 5)}>
-                          <Feather name="plus" size={20} color={theme.colors.text1} />
-                      </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.settingRow}>
-                  <View>
-                      <Text style={styles.inputLabel}>My Break Time</Text>
-                  </View>
-                  <View style={styles.stepper}>
-                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('break', -1)}>
-                          <Feather name="minus" size={20} color={theme.colors.text1} />
-                      </TouchableOpacity>
-                      <Text style={styles.stepText}>{myJoinBreakTime} m</Text>
-                      <TouchableOpacity style={styles.stepButton} onPress={() => adjustJoinSetting('break', 1)}>
-                          <Feather name="plus" size={20} color={theme.colors.text1} />
-                      </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={handleCancelJoin}>
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} onPress={confirmJoinIndependentRoom}>
-                    <Text style={styles.confirmButtonText}>Enter Room</Text>
-                  </TouchableOpacity>
-                </View>
-
-              </Pressable>
-            </Pressable>
           </KeyboardAvoidingView>
         </Modal>
 
@@ -886,19 +702,87 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.text1 
   },
 
-  headerRightActions: { flexDirection: 'row', alignItems: 'center' },
-  bellButton: { position: 'relative', marginRight: 18, padding: 5 },
-  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: '#EF4444', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.colors.background },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
-  notifModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  notifCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
-  notifInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  notifText: { fontSize: 15, color: theme.colors.text1, lineHeight: 22 },
-  notifActions: { flexDirection: 'row', justifyContent: 'flex-end' },
-  declineBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15, backgroundColor: '#F3F4F6', marginRight: 10 },
-  declineBtnText: { color: theme.colors.text2, fontWeight: 'bold', fontSize: 13 },
-  acceptBtn: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 15, backgroundColor: theme.colors.primary },
-  acceptBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  headerRightActions: { 
+      flexDirection: 'row', 
+      alignItems: 'center' 
+    },
+  bellButton: { 
+    position: 'relative', 
+    marginRight: 18, 
+    padding: 5 
+  },
+  badge: { 
+    position: 'absolute', 
+    top: 0, 
+    right: 0, 
+    backgroundColor: '#EF4444', 
+    width: 18, 
+    height: 18, 
+    borderRadius: 9, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 2, 
+    borderColor: theme.colors.background 
+  },
+  badgeText: { 
+    color: '#FFF', 
+    fontSize: 10, 
+    fontWeight: 'bold' 
+  },
+  notifModalHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  notifCard: { 
+    backgroundColor: '#FFF', 
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 12, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.05, 
+    shadowRadius: 5, 
+    elevation: 2 
+  },
+  notifInfo: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 12 
+  },
+  notifText: { 
+    fontSize: 15, 
+    color: theme.colors.text1, 
+    lineHeight: 22 
+  },
+  notifActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end' 
+  },
+  declineBtn: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 15, 
+    borderRadius: 15, 
+    backgroundColor: '#F3F4F6', 
+    marginRight: 10 
+  },
+  declineBtnText: { 
+    color: theme.colors.text2, 
+    fontWeight: 'bold', 
+    fontSize: 13 
+  },
+  acceptBtn: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 15, 
+    borderRadius: 15, 
+    backgroundColor: theme.colors.primary 
+  },
+  acceptBtnText: { 
+    color: '#FFF', 
+    fontWeight: 'bold', 
+    fontSize: 13 
+  },
 
   createButton: { 
     flexDirection: 'row', 

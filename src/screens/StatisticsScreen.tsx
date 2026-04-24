@@ -2,8 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, Dimensions, View, ScrollView } from
 import { useState, useMemo } from 'react'
 import { LineChart, PieChart, BarChart } from 'react-native-chart-kit'
 import { useTheme } from '../utils/ThemeContext'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Theme } from 'src/utils/Themes'
+import { Theme, themes } from 'src/utils/Themes'
 import { useSessions } from 'src/utils/FetchSessions'
 
 const screenWidth = Dimensions.get('window').width
@@ -20,30 +19,6 @@ type SmartScheduleSessions = {
   room: string
   skipped: boolean
   title: string
-}
-
-function ProgressBar({ progress }: { progress: number}) {
-  return (
-    <View style={{ margin: 20 }}>
-      <View
-        style={{
-          height: 15,
-          width: "100%",
-          backgroundColor: "#eee",
-          borderRadius: 10,
-          overflow: "hidden"
-        }}
-      >
-        <View
-          style={{
-            height: "100%",
-            width: `${progress * 100}%`,
-            backgroundColor: "#4CAF50"
-          }}
-        />
-      </View>
-    </View>
-  );
 }
 
 export default function StatisticsScreen() {
@@ -233,9 +208,33 @@ export default function StatisticsScreen() {
     return result
   }
 
+  function ProgressBar({ progress }: { progress: number}) {
+  return (
+    <View style={{ margin: 20 }}>
+      <View
+        style={{
+          height: 15,
+          width: "100%",
+          backgroundColor: "#eee",
+          borderRadius: 10,
+          overflow: "hidden"
+        }}
+      >
+        <View
+          style={{
+            height: "100%",
+            width: `${progress * 100}%`,
+            backgroundColor: theme.colors.text1
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
   function getColor(progress: number) {
     if (progress < 0.3) return "#F44336";
-    if (progress < 0.7) return "#FFC107";
+    if (progress < 0.7) return "#eeb408";
     return "#4CAF50";
   }
 

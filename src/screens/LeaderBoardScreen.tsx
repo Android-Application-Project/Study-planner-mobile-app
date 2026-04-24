@@ -4,7 +4,7 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator } from 'react-native';
 import { useTheme } from 'src/utils/ThemeContext';
 import { Theme } from 'src/utils/Themes';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import AppSegmentedControl from 'src/components/SegmentedControl';
 
 export interface LeaderboardUser {
@@ -65,9 +65,6 @@ export default function LeaderboardScreen() {
                     <Image source={{ uri: item.avatar }} style={styles.avatar} />
                     <View>
                         <Text style={styles.username}>{item.username}</Text>
-                        <Text style={styles.subtext}>
-                            {activeTab === 'completedMinutes' ? `🔥 ${item.streak} streak` : `${hours} h`}
-                        </Text>
                     </View>
                 </View>
                 
@@ -78,7 +75,7 @@ export default function LeaderboardScreen() {
                     {activeTab === 'completedMinutes' ? (
                         <Text style={styles.coinText}>h</Text>
                     ) : (
-                        <Text>🔥</Text>
+                        <FontAwesome5 name="fire" size={18} color="#FF6B00" />
                     )}
                 </View>
             </View>
@@ -153,7 +150,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         paddingVertical: 5, 
         borderRadius: 12 
     },
-    coinText: { marginLeft: 5, fontWeight: 'bold', color: '#B8860B' },
+    coinText: { marginLeft: 5, fontWeight: 'bold', color: theme.colors.primary },
     headerArea: {
         alignItems: 'center',
         paddingTop: 20,
@@ -161,8 +158,8 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     },
     mainTitle: { 
         fontSize: 22, 
-        fontWeight: '900', // Heavy weight for "GLOBAL RANKING" look
-        color: '#556B52', 
+        fontWeight: '900', 
+        color: theme.colors.text, 
         letterSpacing: 1.5,
         marginBottom: 20 
     },
@@ -181,7 +178,6 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     },
     activePill: {
         backgroundColor: '#556B52',
-        // Subtle elevation for the active choice
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -195,8 +191,8 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     activePillText: {
         color: '#FFFFFF',
     },
-    topRankText: { color: '#556B52' }, // Highlights top 3 numbers
+    topRankText: { color: '#556B52' },
     subtext: { fontSize: 11, color: '#999' },
     metricContainer: { flexDirection: 'row', alignItems: 'center' },
-    metricValue: { fontSize: 17, fontWeight: 'bold', color: '#556B52', marginRight: 4 },
+    metricValue: { fontSize: 17, fontWeight: 'bold', color: theme.colors.text, marginRight: 4 },
 });

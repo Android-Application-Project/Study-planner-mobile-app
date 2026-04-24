@@ -39,11 +39,6 @@ export default function LogInScreen({ navigation }: { navigation: any }) {
         value={email}
         onChangeText={setEmail}
       />
-
-      {error ? 
-        <Text style={styles.errorMessage}>{error}</Text>
-        : null
-      }
       
       <View style={styles.passwordContainer}>
         <TextInput
@@ -66,6 +61,11 @@ export default function LogInScreen({ navigation }: { navigation: any }) {
           />
         </TouchableOpacity>
       </View>
+
+      {error ? 
+        <Text style={styles.errorMessage}>{error}</Text>
+        : null
+      }
 
       <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
         <Text style={styles.loginButtonText}>Login</Text>

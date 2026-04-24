@@ -9,12 +9,19 @@ export default function FirstScreen({ navigation }: any) {
   const { theme } = useTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
   
-  const animals = ["🐸","🐱","🦊","🐷","🐶"]
+  const animals = [
+    { id: 'adultCrocodile', img: require('../assets/Animal/AdultCrocodile.png') },
+    { id: 'adultElephant', img: require('../assets/Animal/AdultElephant.png') },
+    { id: 'adultShark', img: require('../assets/Animal/AdultShark.png') },
+    { id: 'childCrocodile', img: require('../assets/Animal/ChildCrocodile.png') },
+    { id: 'childElephant', img: require('../assets/Animal/ChildElephant.png') },
+    { id: 'childShark', img: require('../assets/Animal/KidShark.png') },
+  ]
   const animations = useRef(animals.map(() => new Animated.Value(0))).current
 
   const startPositions = animals.map(() => Math.random() > 0.5 ? -100 : width + 100)
   const laneHeight = height * 0.5 / animals.length;
-  const topPositions = animals.map((_, i) => i * laneHeight + 40)
+  const topPositions = animals.map((_, i) => i * laneHeight + 10)
 
 
   useEffect(() => {
@@ -38,12 +45,18 @@ export default function FirstScreen({ navigation }: any) {
     <View style={styles.container}>
       <View style={styles.animals}>
         {animals.map((animal, index) => (
-          <Animated.Text 
-            key={index}
-            style={[styles.animal, { top: topPositions[index], transform: [{ translateX: animations[index] }]}]}
-          >
-            {animal}
-          </Animated.Text>
+          <Animated.Image 
+            key={animal.id}
+            source={animal.img}
+            style={[
+              styles.animal, 
+              { 
+                top: topPositions[index], 
+                transform: [{ translateX: animations[index] }]
+              }
+            ]}
+            resizeMode='contain'
+          />
         ))}
       </View>
 
@@ -63,7 +76,7 @@ export default function FirstScreen({ navigation }: any) {
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    paddingVertical: 80
+    paddingBottom: 80
   },
   buttonsContainer: {
     backgroundColor: theme.colors.background,
@@ -73,11 +86,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   animals: {
     flex: 1,
-    paddingVertical: 80
   },
   animal: {
     position: "absolute",
-    fontSize: 60
+    height: 400,
+    width: 80
   },
   loginButton: {
       width: '100%',
@@ -89,7 +102,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   registerButton: {
       width: '100%',
-      backgroundColor: theme.colors.secondary2,
+      backgroundColor: theme.colors.text2,
       padding: 15,
       borderRadius: 12,
       alignItems: 'center',

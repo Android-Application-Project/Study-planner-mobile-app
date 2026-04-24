@@ -35,17 +35,17 @@ const navFonts = Platform.select({
 });
 
 export const DefaultTheme = {
-  name: 'default',
+  name: 'Default',
   dark: false,
   fonts: navFonts,
   price: 0,
   colors: {
     primary: '#84A98C', 
     secondary1: '#2F3E46', 
-    secondary2: '#b1c7b6',
+    secondary2: '#f7f3e9',
     text1: '#354F52',
     text2: '#52796F',
-    card: '#baceac', 
+    card: '#b8d7be', 
     text: '#354F52',
     border: 'transparent',
     notification: '#ff0000',
@@ -54,7 +54,7 @@ export const DefaultTheme = {
 };
 
 export const BlueTheme = {
-  name: 'blue',
+  name: 'Blue',
   dark: false,
   fonts: navFonts,
   price: 150,
@@ -72,45 +72,26 @@ export const BlueTheme = {
   },
 };
 export const PurpleTheme = {
-  name: 'purple',
+  name: 'Purple',
   dark: false,
   fonts: navFonts,
   price: 200,
   colors: {
-    primary: '#9C27B0',
-    secondary1: '#BA68C8',
-    secondary2: '#E1BEE7',
-    text1: '#4A148C',
-    text2: '#7B1FA2',
-    card: '#E1BEE7',     
-    text: '#4A148C',    
+    primary: '#8586b2',
+    secondary1: '#bebfde',
+    secondary2: '#f0ebe2',
+    text1: '#6360a5',
+    text2: '#93856a',
+    card: '#b4a1be',     
+    text: '#73749a',    
     border: 'transparent',
     notification: '#ff0000',
-    background: '#F3E5F5',
+    background: '#d4d2ce',
   },
 }
 
-export const DarkBlueTheme = {
-  name: 'darkBlue',
-  dark: true,
-  fonts: navFonts,
-  price: 300,
-  colors: {
-    primary: '#215796',
-    secondary1: '#1E88E5',
-    secondary2: '#42A5F5',
-    text1: '#E3F2FD',
-    text2: '#90CAF9',
-    card: '#18324e',
-    text: '#E3F2FD',
-    border: '#1B263B',
-    notification: '#FF5252',
-    background: '#0A1929',
-  },
-};
-
 export const BeigeTheme = {
-  name: 'beige',
+  name: 'Beige',
   dark: true,
   fonts: navFonts,
   price: 200,
@@ -123,7 +104,7 @@ export const BeigeTheme = {
     card: '#fffaf2',
     text: '#605c59',
     border: '#f2d2bb',
-    notification: '#FF5252',
+    notification: '#d24949',
     background: '#eee7d5',
   },
 };
@@ -132,7 +113,6 @@ export const themes = {
   default: DefaultTheme,
   blue: BlueTheme,
   purple: PurpleTheme,
-  darkBlue: DarkBlueTheme,
   beige: BeigeTheme
 };
 
