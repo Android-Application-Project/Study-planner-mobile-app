@@ -3,8 +3,9 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore'
 import { db, auth } from '../../firebaseConfig'
-import { useTheme } from '../utils/ThemeContext';
-import { Theme } from '../utils/Themes'; 
+import { useTheme } from '../utils/ThemeContext'
+import { Theme, themes } from '../utils/Themes'
+import Currency, { formatCurrency } from 'src/components/Currency'
 
 interface StoreItem {
   id: string;
@@ -13,12 +14,12 @@ interface StoreItem {
   color?: string; 
 }
 
-const mockThemes: StoreItem[] = [
-  { id: 'default', name: 'Default', price: 0, color: '#84A98C' },
-  { id: 'blue', name: 'Ocean Blue', price: 150, color: '#64B5F6' },
-  { id: 'purple', name: 'Royal Purple', price: 200, color: '#BA68C8' },
-  { id: 'darkBlue', name: 'Dark Mode', price: 300, color: '#2F3E46' },
-];
+const themeStoreItem : StoreItem[] = Object.entries(themes).map(([key, value]) => ({
+  id: key,
+  name: value.name,
+  price: value.price,
+  color: value.colors.primary
+}))
 
 const animals: StoreItem[] = [
   { id: 'elephant', name: 'Elephant', price: 0 },
@@ -30,6 +31,13 @@ const ANIMAL_IMAGES = {
   elephant: require('../assets/Animal/AdultElephant.png'),
   crocodile: require('../assets/Animal/AdultCrocodile.png'),
   shark: require('../assets/Animal/AdultShark.png'),
+};
+
+const THEME_IMAGES = {
+  default: require('../assets/Theme/green.png'),
+  beige: require('../assets/Theme/beige.png'),
+  blue: require('../assets/Theme/blue.png'),
+  purple: require('../assets/Theme/purple.png')
 };
 
 const screenWidth = Dimensions.get('window').width;
@@ -59,7 +67,7 @@ export default function StoreScreen() {
   const [currentPetId, setCurrentPetId] = useState('elephant');
   const [unlockedThemes, setUnlockedThemes] = useState(['default']);
 
-  const displayData: StoreItem[] = activeTab === 'themes' ? mockThemes : animals;
+  const displayData: StoreItem[] = activeTab === 'themes' ? themeStoreItem : animals;
 
   useEffect(() => {
     if (!USER_ID) return;
@@ -90,11 +98,11 @@ export default function StoreScreen() {
       }
     } else {
       if (coins < item.price) {
-        Alert.alert("Error", "Not enough 🐟 coins!");
+        Alert.alert("Error", "Not enough coins!");
         return;
       }
 
-      Alert.alert("Confirm Purchase", `Buy ${item.name} for 🐟 ${item.price}?`, [
+      Alert.alert("Confirm Purchase", `Buy ${item.name} for ${formatCurrency(item.price)} coins?`, [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Buy", 
@@ -131,7 +139,7 @@ export default function StoreScreen() {
         onPress={() => handleAction(item)}
       >
         <Text style={[styles.actionButtonText, isOwned && { color: theme.colors.text1 }]}>
-          {isOwned ? "Use" : `🐟 ${item.price}`}
+          {isOwned ? "Use" : <Currency amount={item.price}/>}
         </Text>
       </TouchableOpacity>
     );
@@ -143,7 +151,13 @@ export default function StoreScreen() {
     return (
       <View style={styles.cardContainer}>
         {isTheme ? (
-          <View style={[styles.previewArea, { backgroundColor: item.color }]} />
+          <View style={styles.previewArea}>
+              <Image
+                source={THEME_IMAGES[item.id as keyof typeof THEME_IMAGES]}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            </View>        
         ) : (
           <View style={[styles.previewArea, styles.animalPreviewBg]}>
             <Image 
@@ -166,7 +180,7 @@ export default function StoreScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Store</Text>
         <View style={styles.coinBadge}>
-          <Text style={styles.coinText}>🐟 {coins}</Text>
+          <Currency amount={coins}/>
         </View>
       </View>
 
@@ -314,7 +328,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   buttonBuy: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.background,
   },
   actionButtonText: {
     fontSize: 14,

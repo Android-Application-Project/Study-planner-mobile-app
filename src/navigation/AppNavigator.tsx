@@ -57,28 +57,7 @@ function Tabs() {
         }
       }
     })}>
-        <Tab.Screen 
-          name='Home' 
-          component={HomeScreen}
-          listeners={({ navigation }) => ({
-            tabPress: (e) => {
-              const state = navigation.getState();
-              const homeRoute = state.routes.find((r) => r.name === 'Home');
-              const params = homeRoute?.params as any
-
-              const isActive = params?.isActive ?? false;
-
-              if (strictModeEnabled && isActive) {
-                e.preventDefault(); 
-                
-                Alert.alert(
-                  "Session Locked", 
-                  "Strict Mode is active. You must finish your session first!"
-                );
-              }
-            },
-          })}
-        />     
+        <Tab.Screen name='Home' component={HomeScreen}/>     
         <Tab.Screen name='Social' component={RoomScreen}/>
         <Tab.Screen name='Create' component={CreateScheduleScreen}/>
         <Tab.Screen name='Store' component={StoreScreen}/>

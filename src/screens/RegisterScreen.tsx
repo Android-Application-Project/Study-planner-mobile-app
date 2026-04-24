@@ -80,7 +80,7 @@ export default function registerScreen({ navigation }: { navigation: any }) {
           <Feather
             name={showPassword ? "eye" : "eye-off"}
             size={22}
-            color="gray"
+            color={theme.colors.text}
           />
         </TouchableOpacity>
       </View>

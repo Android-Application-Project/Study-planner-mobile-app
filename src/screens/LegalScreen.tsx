@@ -31,8 +31,8 @@ export default function LegalScreen() {
 
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: theme.colors.background },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#556B52', marginBottom: 5 },
+  title: { fontSize: 24, fontWeight: 'bold', color: theme.colors.text1, marginBottom: 5 },
   date: { fontSize: 14, color: '#888', marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#556B52', marginTop: 15, marginBottom: 5 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: theme.colors.text1, marginTop: 15, marginBottom: 5 },
   body: { fontSize: 15, color: '#333', lineHeight: 22 },
 });

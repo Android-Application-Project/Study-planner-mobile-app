@@ -4,6 +4,7 @@ export type Theme = {
   name: string;
   dark: boolean;
   fonts: any;
+  price: number;
   colors: {
     primary: string;
     secondary1: string,
@@ -34,16 +35,17 @@ const navFonts = Platform.select({
 });
 
 export const DefaultTheme = {
-  name: 'default',
+  name: 'Default',
   dark: false,
   fonts: navFonts,
+  price: 0,
   colors: {
     primary: '#84A98C', 
     secondary1: '#2F3E46', 
-    secondary2: '#b1c7b6',
+    secondary2: '#f7f3e9',
     text1: '#354F52',
     text2: '#52796F',
-    card: '#baceac',   // #cddec3 
+    card: '#b8d7be', 
     text: '#354F52',
     border: 'transparent',
     notification: '#ff0000',
@@ -51,28 +53,11 @@ export const DefaultTheme = {
   },
 };
 
-export const Default1Theme = {
-  name: 'default',
-  dark: false,
-  fonts: navFonts,
-  colors: {
-    primary: '#84A98C',
-    secondary1: '#2F3E46',
-    secondary2: '#CBF3BB',
-    text1: '#354F52',
-    text2: '#52796F',
-    card: '#C2D1B8',      
-    text: '#354F52',     
-    border: 'transparent',
-    notification: '#ff0000',
-    background: '#CAD2C5',
-  },
-};
-
 export const BlueTheme = {
-  name: 'blue',
+  name: 'Blue',
   dark: false,
   fonts: navFonts,
+  price: 150,
   colors: {
     primary: '#2196F3',
     secondary1: '#64B5F6',
@@ -87,38 +72,40 @@ export const BlueTheme = {
   },
 };
 export const PurpleTheme = {
-  name: 'purple',
+  name: 'Purple',
   dark: false,
   fonts: navFonts,
+  price: 200,
   colors: {
-    primary: '#9C27B0',
-    secondary1: '#BA68C8',
-    secondary2: '#E1BEE7',
-    text1: '#4A148C',
-    text2: '#7B1FA2',
-    card: '#E1BEE7',     
-    text: '#4A148C',    
+    primary: '#8586b2',
+    secondary1: '#bebfde',
+    secondary2: '#f0ebe2',
+    text1: '#6360a5',
+    text2: '#93856a',
+    card: '#b4a1be',     
+    text: '#73749a',    
     border: 'transparent',
     notification: '#ff0000',
-    background: '#F3E5F5',
+    background: '#d4d2ce',
   },
 }
 
-export const DarkBlueTheme = {
-  name: 'darkBlue',
+export const BeigeTheme = {
+  name: 'Beige',
   dark: true,
   fonts: navFonts,
+  price: 200,
   colors: {
-    primary: '#215796',
-    secondary1: '#1E88E5',
-    secondary2: '#42A5F5',
-    text1: '#E3F2FD',
-    text2: '#90CAF9',
-    card: '#18324e',
-    text: '#E3F2FD',
-    border: '#1B263B',
-    notification: '#FF5252',
-    background: '#0A1929',
+    primary: '#7fc4bd',
+    secondary1: '#a4bbcf',
+    secondary2: '#f3e9d4',
+    text1: '#4e3425',
+    text2: '#4b4748',
+    card: '#fffaf2',
+    text: '#605c59',
+    border: '#f2d2bb',
+    notification: '#d24949',
+    background: '#eee7d5',
   },
 };
 
@@ -126,7 +113,7 @@ export const themes = {
   default: DefaultTheme,
   blue: BlueTheme,
   purple: PurpleTheme,
-  darkBlue: DarkBlueTheme
+  beige: BeigeTheme
 };
 
 export type ThemeName = keyof typeof themes;

@@ -14,6 +14,7 @@ import { db, auth } from '../../firebaseConfig'
 import { useTheme } from 'src/utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { usePreferences } from 'src/utils/PreferencesContext'
+import tinycolor from 'tinycolor2'
 
 const { width } = Dimensions.get('window');
 
@@ -286,34 +287,6 @@ export default function HomeScreen() {
     navigation.setParams({ isTimerActive: isActive });
   }, [isActive, navigation]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('tabPress' as any, (e: any) => {
-      
-      if (strictModeEnabled && isActive) {
-        e.preventDefault();
-
-        Alert.alert(
-          'Session Locked',
-          'Strict Mode is active!',
-          [
-            { text: 'Stay Focused', style: 'cancel' },
-            {
-              text: 'Quit & Leave',
-              style: 'destructive',
-              onPress: () => {
-                setIsActive(false); 
-                setIsBreak(false);
-                setTimeLeft(focusMinutes * 60);            
-              },
-            },
-          ]
-        );
-      }
-    });
-
-    return unsubscribe;
-  }, [navigation, strictModeEnabled, isActive, vibrationEnabled, timeLeft])
-
   useEffect(() => { syncToFirebase(); }, [currentMode, isActive, isBreak, selectedPetId]);
 
   useEffect(() => {
@@ -382,6 +355,10 @@ export default function HomeScreen() {
   const rad = (angle - 90) * (Math.PI / 180);
   const handleX = CIRCLE_RADIUS + RING_CENTER_R * Math.cos(rad);
   const handleY = CIRCLE_RADIUS + RING_CENTER_R * Math.sin(rad);
+
+  const darkerBg = theme.dark
+    ? tinycolor(theme.colors.background).lighten(5).toString()
+    : tinycolor(theme.colors.background).darken(5).toString();
 
   const renderPetOption = ({ item }: { item: any }) => {
     const isUnlocked = unlockedPets.includes(item.id)
@@ -476,7 +453,7 @@ export default function HomeScreen() {
       <View ref={timerViewRef} onLayout={measureCenter} style={styles.timerContainer} {...panResponder.panHandlers}>
         <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
           <G rotation="-90" origin={`${CIRCLE_RADIUS}, ${CIRCLE_RADIUS}`}>
-            <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={theme.dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"} strokeWidth={RING_WIDTH} fill="none" />
+            <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={darkerBg} strokeWidth={RING_WIDTH} fill="none" />
             <Circle cx={CIRCLE_RADIUS} cy={CIRCLE_RADIUS} r={RING_CENTER_R} stroke={theme.colors.primary} strokeWidth={RING_WIDTH} fill="none" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progressRatio)} strokeLinecap="round" />
           </G>
         </Svg>

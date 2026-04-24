@@ -4,13 +4,14 @@ import { useTheme } from '../utils/ThemeContext'
 import { Theme } from '../utils/Themes'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { auth, db } from '../../firebaseConfig'
-import { signOut } from 'firebase/auth'
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { signOut, deleteUser } from 'firebase/auth'
+import { doc, onSnapshot, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../supabaseConfig'
 import { Ionicons } from '@expo/vector-icons'
 import Feather from '@expo/vector-icons/Feather'
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons'
+import AntDesign from '@expo/vector-icons/AntDesign'
 import { useSessions } from 'src/utils/FetchSessions'
 import { useNavigation, NavigationProp } from '@react-navigation/native'
 import { usePreferences } from 'src/utils/PreferencesContext'
@@ -212,6 +213,41 @@ export default function MenuScreen() {
 
     const completedHours = (completedMinutes / 60).toFixed(1)
 
+    const handleDeleteAccount = async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        Alert.alert(
+            "Delete Account",
+            "This will permanently delete your account. This action cannot be undone.",
+            [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                try {
+                    await deleteDoc(doc(db, "users", user.uid));
+
+                    await deleteUser(user);
+
+                    Alert.alert("Account deleted");
+                } catch (error: any) {
+                    console.log(error);
+
+                    if (error.code === "auth/requires-recent-login") {
+                    Alert.alert(
+                        "Please log in again",
+                        "For security, re-login is required before deleting your account."
+                    );
+                    }
+                }
+                },
+            },
+            ]
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -253,37 +289,25 @@ export default function MenuScreen() {
                     <View style={styles.settingsGroup}>
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <MaterialIcons name="vibration" size={24} color="#556B52" />
+                                <MaterialIcons name="vibration" size={24} color={theme.colors.primary} />
                                 <Text style={styles.settingText}>Vibration</Text>
                             </View>
                             <Switch 
                                 value={vibrationEnabled} 
                                 onValueChange={setVibrationEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
 
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <Ionicons name="notifications-outline" size={22} color="#556B52" />
+                                <Ionicons name="notifications-outline" size={22} color={theme.colors.primary}/>
                                 <Text style={styles.settingText}>Notifications</Text>
                             </View>
                             <Switch 
                                 value={notificationsEnabled} 
                                 onValueChange={handleNotificationChange}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
-                            />
-                        </View>
-
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingLeft}>
-                                <Ionicons name="lock-closed-outline" size={24} color={theme.colors.primary} />
-                                <Text style={styles.settingText}>Strict Mode</Text>
-                            </View>
-                            <Switch 
-                                value={strictModeEnabled} 
-                                onValueChange={setStrictModeEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
 
@@ -295,7 +319,7 @@ export default function MenuScreen() {
                             <Switch 
                                 value={libraryAccessEnabled} 
                                 onValueChange={setLibraryAccessEnabled}
-                                trackColor={{ false: '#D1D1D1', true: '#A8C2A0' }}
+                                trackColor={{ false: '#D1D1D1', true: theme.colors.primary }}
                             />
                         </View>
                     </View>
@@ -317,7 +341,7 @@ export default function MenuScreen() {
                         <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('LeaderBoardScreen')}>
                             <View style={styles.settingLeft}>
                                 <MaterialIcons name="leaderboard" size={24} color={theme.colors.primary} />
-                                <Text style={styles.settingText}>Leader Board</Text>
+                                <Text style={styles.settingText}>Leaderboard</Text>
                             </View>
                             
                             <Ionicons name="chevron-forward" size={18} color="#C4C4C4" />
@@ -342,8 +366,13 @@ export default function MenuScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(auth)}>
-                    <Ionicons name="exit-outline" size={20} color="#6B8E7D" style={{marginRight: 8}} />
+                    <Ionicons name="exit-outline" size={20} color={theme.colors.text} style={{marginRight: 8}} />
                     <Text style={styles.logoutText}>Log Out</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+                    <AntDesign name="user-delete" size={20} color={theme.colors.notification} style={{marginRight: 8}} />
+                    <Text style={styles.deleteText}>Delete Account</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.versionText}>Study Planner v1.0.0</Text>
@@ -469,7 +498,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         marginBottom: 20,
     },
     statBox: {
-        backgroundColor: '#FFF',
+        backgroundColor: theme.colors.secondary2,
         width: '31%',
         paddingVertical: 15,
         borderRadius: 15,
@@ -483,11 +512,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     statValue: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: '#556B52',
+        color: theme.colors.text1,
     },
     statLabel: {
         fontSize: 11,
-        color: '#8A9A85',
+        color: theme.colors.text,
         marginTop: 5,
     },
     menuList: {
@@ -522,7 +551,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         width: '100%',
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderColor: '#6B8E7D',
+        borderColor: theme.colors.text,
         padding: 15,
         borderRadius: 15,
         flexDirection: 'row',
@@ -531,7 +560,24 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         marginTop: 30,
     },
     logoutText: {
-        color: '#6B8E7D',
+        color: theme.colors.text,
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    deleteButton: {
+        width: '100%',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderColor: theme.colors.notification,
+        padding: 15,
+        borderRadius: 15,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 30,
+    },
+    deleteText: {
+        color: theme.colors.notification,
         fontWeight: 'bold',
         fontSize: 16,
     },
@@ -573,7 +619,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     uploadOptionText: { marginLeft: 10, color: '#007AFF', fontWeight: 'bold' },
     avatarImage: { width: 70, height: 70, borderRadius: 35 },
     settingsGroup: {
-        backgroundColor: '#FFF',
+        backgroundColor: theme.colors.secondary2,
         borderRadius: 20,
         paddingHorizontal: 15,
         elevation: 1,
@@ -588,7 +634,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        borderBottomColor: '#e5e0e0',
     },
     settingLeft: {
         flexDirection: 'row',
