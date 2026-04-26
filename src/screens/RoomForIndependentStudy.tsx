@@ -251,6 +251,7 @@ export default function RoomForIndependentStudy() {
 
   useEffect(() => {
     let iv: any = null;
+    
     if (isActive && timeLeft > 0) {
       iv = setInterval(() => {
         setTimeLeft(t => t - 1);
@@ -258,35 +259,65 @@ export default function RoomForIndependentStudy() {
           setElapsedSeconds(prev => prev + 1);
         }
       }, 1000);
-    } else if (isActive && timeLeft === 0) {
+    } 
+    else if (isActive && timeLeft === 0) {
       setIsActive(false);
 
       if (currentMode === 'Study') {
         const earnedCoins = Math.floor(elapsedSeconds / 60);
-
         playNotificationSound('complete');
 
-        if (earnedCoins > 0) {
-          const userRef = doc(db, 'users', currentUserId!);
-          updateDoc(userRef, {
-            coins: increment(earnedCoins)
-          });
-          Alert.alert("Goal Reached!", `Amazing! You earned 🐟 ${earnedCoins} coins for staying focused!`);
-        } else {
-          Alert.alert("Goal Reached!", "Good job, but focus longer next time to earn coins!");
-        }
-        
+        const updateStreakAndCoins = async () => {
+          if (!currentUserId) return;
+          
+          try {
+            const userRef = doc(db, 'users', currentUserId);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
+              const today = new Date().toISOString().split('T')[0];
+              const lastDate = userData.lastFocusDate || "";
+              
+              let updateObj: any = {};
+              if (lastDate !== today) {
+                updateObj.streak = (userData.streak || 0) + 1;
+                updateObj.lastFocusDate = today; 
+              }
+
+              if (earnedCoins > 0) {
+                updateObj.coins = increment(earnedCoins);
+              }
+              updateObj.completedMinutes = increment(Math.floor(elapsedSeconds / 60));
+
+              if (Object.keys(updateObj).length > 0) {
+                await updateDoc(userRef, updateObj);
+              }
+
+              if (lastDate !== today) {
+                Alert.alert("Goal Reached!", `🔥 Streak Up! Total: ${ (userData.streak || 0) + 1 }\n🐟 Earned: ${earnedCoins} coins`);
+              } else {
+                Alert.alert("Goal Reached!", `Keep it up! 🐟 Earned: ${earnedCoins} coins\n(Streak already updated today)`);
+              }
+            }
+          } catch (error) {
+            console.error("Streak Update Error:", error);
+          }
+        };
+
+        updateStreakAndCoins();
         setElapsedSeconds(0); 
       } else {
         playNotificationSound('breakEnd');
-
         setCurrentMode('Study');
       }
+      
       setTimeLeft(focusMinutes * 60);
       syncMyStatus();
     }
+    
     return () => clearInterval(iv);
-  }, [isActive, timeLeft, currentMode]);
+  }, [isActive, timeLeft, currentMode, currentUserId, elapsedSeconds, focusMinutes]);
 
   const getCurrentPetImage = () => {
     const pet = (PETS_DATA as any)[selectedPetId] || PETS_DATA.elephant;
