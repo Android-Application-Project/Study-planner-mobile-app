@@ -257,6 +257,8 @@ export default function RoomForStudyTogether() {
 
       if (currentMode === 'Study') {
         (async () => {
+          if (!currentUserId) return;
+          
           try {
             const roomSnap = await getDoc(doc(db, 'rooms', roomId));
             if (roomSnap.exists()) {
@@ -267,19 +269,41 @@ export default function RoomForStudyTogether() {
                 const totalDiffSeconds = Math.floor((Date.now() - startTime) / 1000);
                 const targetSeconds = focusMinutes * 60;
                 const finalSeconds = (targetSeconds - totalDiffSeconds < 10) ? targetSeconds : totalDiffSeconds;
-                
                 const earnedCoins = Math.floor(finalSeconds / 60);
 
-                if (earnedCoins > 0) {
-                  const userRef = doc(db, 'users', currentUserId!); 
-                  await updateDoc(userRef, { coins: increment(earnedCoins) });
+                const userRef = doc(db, 'users', currentUserId);
+                const userSnap = await getDoc(userRef);
+                
+                if (userSnap.exists()) {
+                  const userData = userSnap.data();
+                  const today = new Date().toISOString().split('T')[0];
+                  const lastDate = userData.lastFocusDate || "";
+
+                  let updateObj: any = {};
+
+                  if (lastDate !== today) {
+                    updateObj.streak = (userData.streak || 0) + 1;
+                    updateObj.lastFocusDate = today; 
+                  }
+
+                  if (earnedCoins > 0) {
+                    updateObj.coins = increment(earnedCoins);
+                  }
+                  updateObj.completedMinutes = increment(Math.floor(finalSeconds / 60));
+
+                  await updateDoc(userRef, updateObj);
                   playNotificationSound('complete');
-                  Alert.alert("Goal Reached!", `You earned 🐟 ${earnedCoins} coins!`);
+
+                  if (lastDate !== today) {
+                    Alert.alert("Goal Reached!", `\n🐟 Earned: ${earnedCoins} coins`);
+                  } else {
+                    Alert.alert("Goal Reached!", `Keep it up! 🐟 Earned: ${earnedCoins} coins)`);
+                  }
                 }
               }
             }
           } catch (e) {
-            console.log("領取金幣出錯:", e);
+            console.log("Error during checkout for a shared room:", e);
           }
         })();
       } else {
@@ -300,7 +324,7 @@ export default function RoomForStudyTogether() {
     return () => {
       if (iv) clearInterval(iv);
     };
-  }, [isActive, timeLeft, currentMode, isHost, hasCollected]);
+  }, [isActive, timeLeft, currentMode, isHost, hasCollected, currentUserId, roomId, focusMinutes]);
 
   const getCurrentPetImage = () => {
     const pet = (PETS_DATA as any)[selectedPetId] || PETS_DATA.elephant;
