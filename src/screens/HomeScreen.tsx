@@ -883,6 +883,3 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 10,
   },
 });
-: 10,
-  },
-});

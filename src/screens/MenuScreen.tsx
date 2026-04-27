@@ -22,6 +22,7 @@ type UserData = {
   username: string
   avatar: string
   coins: number
+  streak: number
 }
 
 export default function MenuScreen() {
@@ -34,6 +35,7 @@ export default function MenuScreen() {
     const [userData, setUserData] = useState({ avatar: DEFAULT_AVATAR, username: 'Loading ...', completedMinutes: 0 })
     const [avatarLoading, setAvatarLoading] = useState(false)
     const [usernameLoading, setUsernameLoading] = useState(false)
+    const [streak, setStreak] = useState(0)
 
     const [namePopupVisible, setNamePopupVisible] = useState(false)
     const [avatarPopupVisible, setAvatarPopupVisible] = useState(false)
@@ -69,6 +71,7 @@ export default function MenuScreen() {
                 const data = docSnap.data() as UserData
                 setUserData(prev => ({ ...prev, ...data }))
                 setNewName(data.username)
+                setStreak(data.streak)
             }
         })
         return () => unsubscribe()
@@ -171,39 +174,6 @@ export default function MenuScreen() {
             setUsernameLoading(false)
         }
     }
-
-    const streak = useMemo(() => {
-    if (!sessions || sessions.length === 0) return 0;
-
-    const completedDates = new Set<string>();
-
-    sessions.forEach(s => {
-        if (s.completed) {
-        completedDates.add(s.date);
-        }
-    });
-
-    let count = 0;
-    const current = new Date();
-
-    const todayStr = current.toISOString().split("T")[0];
-    if (!completedDates.has(todayStr)) {
-        current.setDate(current.getDate() - 1);
-    }
-
-    while (true) {
-        const dateStr = current.toISOString().split("T")[0];
-
-        if (completedDates.has(dateStr)) {
-        count++;
-        current.setDate(current.getDate() - 1);
-        } else {
-        break;
-        }
-    }
-
-    return count;
-    }, [sessions]);
 
     const completedRatio = sessions.length > 0
         ? Math.round((sessions.filter( session => session.completed).length / sessions.length) * 100)
