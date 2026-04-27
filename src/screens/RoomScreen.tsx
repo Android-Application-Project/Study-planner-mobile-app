@@ -379,7 +379,7 @@ export default function RoomScreen() {
                 styles.cardActionDetail,
                 isFull && { color: '#EF4444' } 
               ]}>
-                  👤 {currentPeople}/{item.max} {isFull ? 'Full' : 'Joined'}
+                   {currentPeople}/{item.max} {isFull ? 'Full' : 'Joined'}
               </Text>
 
               <TouchableOpacity 

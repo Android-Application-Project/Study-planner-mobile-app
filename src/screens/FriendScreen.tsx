@@ -4,6 +4,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { Theme } from '../utils/Themes'; 
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { FontAwesome5 } from '@expo/vector-icons';
 
 import { doc, onSnapshot, collection, query, where, documentId, updateDoc, arrayUnion, getDoc, arrayRemove, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
@@ -175,7 +176,7 @@ export default function FriendScreen() {
           <Text style={styles.friendName}>{item.name || item.username || 'Unknown User'}</Text>
           <Text style={[styles.friendStatus, { color: item.isOnline ? theme.colors.primary : theme.colors.text2 }]}>{item.status || 'Chilling'}</Text>
         </View>
-        <View style={styles.streakContainer}><Text style={styles.streakText}>🔥 {item.streak || 0}</Text></View>
+        <View style={styles.streakContainer}><Text style={styles.streakText}> <FontAwesome5 name="fire" size={14}  color = "#FF6B00"/> {item.streak || 0}</Text></View>
         <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteFriend(item.id, item.name)}>
             <Ionicons name="trash-outline" size={20} color={theme.colors.notification} />
         </TouchableOpacity>
@@ -403,9 +404,10 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 15,
+
   },
   streakText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '800',
     color: theme.colors.primary,
   },
