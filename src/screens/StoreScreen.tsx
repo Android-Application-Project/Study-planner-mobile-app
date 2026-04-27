@@ -48,24 +48,11 @@ export default function StoreScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const USER_ID = auth.currentUser?.uid;
 
-  const uid = auth.currentUser?.uid;
-  if (!uid) return
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'users', uid), (docSnap) => {
-      if(docSnap.exists()) {
-        setCoins(docSnap.data().coins || 0)
-      }
-    })
-
-    return () => unsubscribe()
-  }, [])
-
   const [activeTab, setActiveTab] = useState<'themes' | 'animals'>('themes');
   const [coins, setCoins] = useState(0);
-  const [unlockedPets, setUnlockedPets] = useState(['elephant']);
+  const [unlockedPets, setUnlockedPets] = useState<string[]>(['elephant']);
   const [currentPetId, setCurrentPetId] = useState('elephant');
-  const [unlockedThemes, setUnlockedThemes] = useState(['default']);
+  const [unlockedThemes, setUnlockedThemes] = useState<string[]>(['default']);
 
   const displayData: StoreItem[] = activeTab === 'themes' ? themeStoreItem : animals;
 
@@ -82,6 +69,8 @@ export default function StoreScreen() {
     });
     return () => unsub();
   }, [USER_ID]);
+
+  if (!USER_ID) return null;
 
   const handleAction = async (item: StoreItem) => {
     const isAnimal = activeTab === 'animals';

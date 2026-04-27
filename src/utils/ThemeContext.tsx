@@ -17,24 +17,32 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     const theme = themes[themeName]
 
     useEffect(() => {
+        let unsubscribeSnap: (() => void) | null = null
+
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            if (unsubscribeSnap) {
+                unsubscribeSnap()
+                unsubscribeSnap = null
+            }
+
             if (!user) return
 
             const userRef = doc(db, 'users', user.uid)
 
-            const unsubscribeSnap = onSnapshot(userRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data()
-                if (data.currentThemeId) {
-                setThemeName(data.currentThemeId)
+            unsubscribeSnap = onSnapshot(userRef, (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data()
+                    if (data.currentThemeId) {
+                        setThemeName(data.currentThemeId)
+                    }
                 }
-            }
             })
-
-            return () => unsubscribeSnap()
         })
 
-        return () => unsubscribeAuth()
+        return () => {
+            if (unsubscribeSnap) unsubscribeSnap()
+            unsubscribeAuth()
+        }
     }, [])
 
   return (

@@ -8,7 +8,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import Feather from '@expo/vector-icons/Feather';
 
-export default function registerScreen({ navigation }: { navigation: any }) {
+export default function RegisterScreen({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')

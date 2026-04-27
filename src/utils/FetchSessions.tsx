@@ -17,6 +17,12 @@ type SmartScheduleSessions = {
   title: string
 }
 
+type SmartSchedule = {
+  id?: string
+  subjectName?: string
+  sessions?: SmartScheduleSessions[]
+}
+
 type SessionContextType = {
   sessions: SmartScheduleSessions[]
   loading: boolean
@@ -43,10 +49,10 @@ export function FetchSessions({ children }: any) {
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data()
-                const schedules = data.smartSchedules || []
+                const schedules: SmartSchedule[] = data.smartSchedules || []
 
                 const allSessions = schedules.flatMap(
-                    (schedule: SessionContextType) => schedule.sessions || []
+                    (schedule) => schedule.sessions || []
                 )
 
                 setSessions(allSessions)
