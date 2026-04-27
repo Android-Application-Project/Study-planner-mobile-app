@@ -221,7 +221,7 @@ export default function HomeScreen() {
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.lastFocusDate !== undefined) setLastFocusDate(data.lastFocusDate);
 
-        setUnlockedPets(data.unlockedPets)
+        setUnlockedPets(data.unlockedPets || ['elephant'])
 
         if (data.selectedPetId){
           setSelectedPetId(data.selectedPetId)
@@ -881,5 +881,8 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 20,
     marginTop: 10,
+  },
+});
+: 10,
   },
 });

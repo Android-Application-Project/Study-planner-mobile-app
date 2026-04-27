@@ -90,7 +90,7 @@ export default function FriendScreen() {
               });
 
               await updateDoc(friendRef,{
-                friendsIds: arrayRemove(currentUserId)
+                friendIds: arrayRemove(currentUserId)
               });
 
               Alert.alert("Success", "Friend removed successfully.");
